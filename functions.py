@@ -3,10 +3,15 @@ import sys
 import logging
 from ftplib import FTP
 
-logging.basicConfig(filename='example.log',level=logging.DEBUG)
-logging.debug('This message should go to the log file')
-logging.info('So should this')
-logging.warning('And this, too')
+logger = logging.getLogger('logger')
+logger.setLevel(logging.WARNING)
+fileHandler = logging.FileHandler('test.log')
+logger.addHandler(fileHandler)
+formatter = logging.Formatter('%(asctime)s  %(levelname)s: %(message)s')
+fileHandler.setFormatter(formatter)
+logger.debug('This message should go to the log file')
+logger.info('So should this')
+logger.warning('And this, too')
 
 #Récupération des variables définies dans le fichier de conf:
 args=sys.argv
