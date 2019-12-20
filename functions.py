@@ -15,7 +15,7 @@ REPPATH=args[1]
 METH=args[2]
 IP_URL_ADDRESS=args[3]
 LOGIN=args[4]
-PASSWORD=[5]
+PASSWORD=args[5]
 NREP=args[6]
 VERSIONNUMBER=args[7]
 
@@ -31,5 +31,31 @@ def localCopy(src,dest):
     dest='/Users/matthieu/Documents/Telecom/Semestre 7/Scripting System/test6'
     destination = shutil.copytree(src,dest)
     print(destination)
+from ftplib import FTP
+def ftpcopy(adresse,login,mdp):
+    with FTP(adresse,login,mdp) as ftp:
+        print(ftp.dir())
+import os
+#ftpcopy(IP_URL_ADDRESS,LOGIN,PASSWORD)
+def copyftp(ftp,path):
+    for name in os.listdir(path):
+        localpath = os.path.join(path,name)
+        if os.path.isfile(localpath):
+            print("STOR", name, localpath)
+            ftp.storbinary('STOR ' + name, open(localpath,'rb'))
+        elif os.path.isdir(localpath):
+            print("MKD", name)
 
+            ftp.mkd(name)
+
+            print("CWD", name)
+            ftp.cwd(name)
+            copyftp(ftp, localpath)
+            print("CWD", "..")
+            ftp.cwd("..")
+
+with FTP(IP_URL_ADDRESS,LOGIN,PASSWORD) as ftp:
+    ftp.mkd("test1")
+    ftp.cwd('test1')
+    copyftp(ftp,"/Users/matthieu/Documents/Telecom/Semestre 7/inforx/Scripting System/test")
 
