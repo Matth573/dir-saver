@@ -54,8 +54,17 @@ def copyftp(ftp,path):
             print("CWD", "..")
             ftp.cwd("..")
 
-with FTP(IP_URL_ADDRESS,LOGIN,PASSWORD) as ftp:
-    ftp.mkd("test1")
-    ftp.cwd('test1')
+def goToDirectory(ftp,path):
+    listdir=path.split('/')
+    if listdir[0]=='':
+        listdir.remove('')
+    for directory in listdir:
+        if not directory in ftp.nlst():
+            ftp.mkd(directory)
+        ftp.cwd(directory)
+
+path = "/Documents/testf/tesrt/lio"
+with FTP(IP_URL_ADDRESS,LOGIN,PASSWORD,path) as ftp:
+    goToDirectory(ftp,path)
     copyftp(ftp,"/Users/matthieu/Documents/Telecom/Semestre 7/inforx/Scripting System/test")
 
