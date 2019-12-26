@@ -11,13 +11,14 @@ fileHandler.setFormatter(formatter)
 
 #Récupération des variables définies dans le fichier de conf:
 args=sys.argv
-REPPATH=args[1]
+DIRPATH=args[1]
 METH=args[2]
 IP_URL_ADDRESS=args[3]
 LOGIN=args[4]
 PASSWORD=args[5]
-NREP=args[6]
-VERSIONNUMBER=args[7]
+SAVEPATH=args[6]
+NREP=args[7]
+VERSIONNUMBER=args[8]
 
 
 def getpaths(directoriesPath):
@@ -26,15 +27,17 @@ def getpaths(directoriesPath):
 from os import walk
 import shutil
 def localCopy(src,dest):
-    logger.info("Copy du dossier")
+    logger.info("Copie du dossier")
     src='/Users/matthieu/Documents/Telecom/Semestre 7/Scripting System/test'
     dest='/Users/matthieu/Documents/Telecom/Semestre 7/Scripting System/test6'
     destination = shutil.copytree(src,dest)
     print(destination)
+
 from ftplib import FTP
 def ftpcopy(adresse,login,mdp):
     with FTP(adresse,login,mdp) as ftp:
         print(ftp.dir())
+
 import os
 #ftpcopy(IP_URL_ADDRESS,LOGIN,PASSWORD)
 def copyftp(ftp,path):
@@ -62,9 +65,8 @@ def goToDirectory(ftp,path):
         if not directory in ftp.nlst():
             ftp.mkd(directory)
         ftp.cwd(directory)
-
 path = "/Documents/testf/tesrt/lio"
-with FTP(IP_URL_ADDRESS,LOGIN,PASSWORD,path) as ftp:
-    goToDirectory(ftp,path)
-    copyftp(ftp,"/Users/matthieu/Documents/Telecom/Semestre 7/inforx/Scripting System/test")
+with FTP(IP_URL_ADDRESS,LOGIN,PASSWORD,SAVEPATH) as ftp:
+    goToDirectory(ftp,SAVEPATH)
+    copyftp(ftp,DIRPATH)
 
