@@ -1,6 +1,7 @@
 import os
 import sys
 import logging
+import paramiko
 
 logger = logging.getLogger('logger')
 logger.setLevel(logging.INFO)
@@ -57,6 +58,29 @@ def copyftp(ftp,path):
             print("CWD", "..")
             ftp.cwd("..")
 
+class MySFTPClient(paramiko.SFTPClient):
+    def put_dir(self, source, target):
+        ''' Uploads the contents of the source directory to the target path. The
+            target directory needs to exists. All subdirectories in source are 
+            created under target.
+        '''
+        for item in os.listdir(source):
+            if os.path.isfile(os.path.join(source, item)):
+                self.put(os.path.join(source, item), '%s/%s' % (target, item))
+            else:
+                self.mkdir('%s/%s' % (target, item), ignore_existing=True)
+                self.put_dir(os.path.join(source, item), '%s/%s' % (target, item))
+
+    def mkdir(self, path, mode=511, ignore_existing=False):
+        ''' Augments mkdir by adding an option to not fail if the folder exists  '''
+        try:
+            super(MySFTPClient, self).mkdir(path, mode)
+        except IOError:
+            if ignore_existing:
+                pass
+            else:
+                raise
+
 def goToDirectory(ftp,path):
     listdir=path.split('/')
     if listdir[0]=='':
@@ -65,8 +89,24 @@ def goToDirectory(ftp,path):
         if not directory in ftp.nlst():
             ftp.mkd(directory)
         ftp.cwd(directory)
-path = "/Documents/testf/tesrt/lio"
-with FTP_TLS(IP_URL_ADDRESS,LOGIN,PASSWORD,SAVEPATH) as ftp:
-    goToDirectory(ftp,SAVEPATH)
-    copyftp(ftp,DIRPATH)
 
+#client = paramiko.SSHClient()
+#client.load_system_host_keys()
+#client.set_missing_host_key_policy(paramiko.AutoAddPolicy)
+#client.connect(hostname, 21, username, password)
+
+if METH == "FTPS" :
+    with FTP_TLS(IP_URL_ADDRESS,LOGIN,PASSWORD,SAVEPATH) as ftp:
+        goToDirectory(ftp,SAVEPATH)
+        copyftp(ftp,DIRPATH)
+if METH == "FTP" : 
+    with FTP(IP_URL_ADDRESS,LOGIN,PASSWORD,SAVEPATH) as ftp:
+        goToDirectory(ftp,SAVEPATH)
+        copyftp(ftp,DIRPATH)
+if METH == "SFTP":
+    transport = paramiko.Transport((IP_URL_ADDRESS, 22))
+    transport.connect(username=LOGIN, password=PASSWORD)
+    sftp = MySFTPClient.from_transport(transport)
+    sftp.mkdir(SAVEPATH + "/test", ignore_existing=True)
+    sftp.put_dir(DIRPATH, SAVEPATH + "/test")
+    sftp.close()
