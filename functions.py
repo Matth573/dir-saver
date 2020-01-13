@@ -33,7 +33,7 @@ def localCopy(src,dest):
     destination = shutil.copytree(src,dest)
     print(destination)
 
-from ftplib import FTP
+from ftplib import FTP,FTP_TLS
 def ftpcopy(adresse,login,mdp):
     with FTP(adresse,login,mdp) as ftp:
         print(ftp.dir())
@@ -66,7 +66,7 @@ def goToDirectory(ftp,path):
             ftp.mkd(directory)
         ftp.cwd(directory)
 path = "/Documents/testf/tesrt/lio"
-with FTP(IP_URL_ADDRESS,LOGIN,PASSWORD,SAVEPATH) as ftp:
+with FTP_TLS(IP_URL_ADDRESS,LOGIN,PASSWORD,SAVEPATH) as ftp:
     goToDirectory(ftp,SAVEPATH)
     copyftp(ftp,DIRPATH)
 
