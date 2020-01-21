@@ -2,6 +2,7 @@ import os
 import sys
 import logging
 import paramiko
+from datetime import datetime
 
 logger = logging.getLogger('logger')
 logger.setLevel(logging.INFO)
@@ -11,6 +12,7 @@ formatter = logging.Formatter('%(asctime)s  %(levelname)s: %(message)s')
 fileHandler.setFormatter(formatter)
 
 #Récupération des variables définies dans le fichier de conf:
+logger.info("Récupération des paramètres spécifiés dans le fichier de configuration")
 args=sys.argv
 DIRPATH=args[1]
 METH=args[2]
@@ -23,7 +25,7 @@ VERSIONNUMBER=args[8]
 
 
 def getpaths(directoriesPath):
-    directoryList=REPPATH.split(",")
+    return directoriesPath.split(",")
 
 from os import walk
 import shutil
@@ -35,12 +37,8 @@ def localCopy(src,dest):
     print(destination)
 
 from ftplib import FTP,FTP_TLS
-def ftpcopy(adresse,login,mdp):
-    with FTP(adresse,login,mdp) as ftp:
-        print(ftp.dir())
 
 import os
-#ftpcopy(IP_URL_ADDRESS,LOGIN,PASSWORD)
 def copyftp(ftp,path):
     for name in os.listdir(path):
         localpath = os.path.join(path,name)
@@ -95,18 +93,42 @@ def goToDirectory(ftp,path):
 #client.set_missing_host_key_policy(paramiko.AutoAddPolicy)
 #client.connect(hostname, 21, username, password)
 
-if METH == "FTPS" :
-    with FTP_TLS(IP_URL_ADDRESS,LOGIN,PASSWORD,SAVEPATH) as ftp:
-        goToDirectory(ftp,SAVEPATH)
-        copyftp(ftp,DIRPATH)
-if METH == "FTP" : 
-    with FTP(IP_URL_ADDRESS,LOGIN,PASSWORD,SAVEPATH) as ftp:
-        goToDirectory(ftp,SAVEPATH)
-        copyftp(ftp,DIRPATH)
-if METH == "SFTP":
-    transport = paramiko.Transport((IP_URL_ADDRESS, 22))
-    transport.connect(username=LOGIN, password=PASSWORD)
-    sftp = MySFTPClient.from_transport(transport)
-    sftp.mkdir(SAVEPATH + "/test", ignore_existing=True)
-    sftp.put_dir(DIRPATH, SAVEPATH + "/test")
-    sftp.close()
+def main():
+
+    if METH == "FTPS" :
+        logger.info("Copie en utilisant le protocole FTPS")
+        with FTP_TLS(IP_URL_ADDRESS,LOGIN,PASSWORD,SAVEPATH) as ftp:
+            goToDirectory(ftp,SAVEPATH)
+            d=datetime.now()
+            ftp.mkd(str(d))
+            ftp.cwd(str(d))
+            for directory in directoryList:
+                logger.info("Copie du dossier : "+directory)
+                nameDirectory = directory.split('/')[-1]
+                ftp.mkd(nameDirectory)
+                ftp.cwd(nameDirectory)
+                copyftp(ftp,directory)
+                ftp.cwd('..')
+    if METH == "FTP" : 
+        with FTP(IP_URL_ADDRESS,LOGIN,PASSWORD,SAVEPATH) as ftp:
+            goToDirectory(ftp,SAVEPATH)
+            d=datetime.now()
+            ftp.mkd(str(d))
+            ftp.cwd(str(d))
+            for directory in directoryList:
+                logger.info("Copie du dossier : "+directory)
+                nameDirectory = directory.split('/')[-1]
+                ftp.mkd(nameDirectory)
+                ftp.cwd(nameDirectory)
+                copyftp(ftp,directory)
+                ftp.cwd('..') 
+    if METH == "SFTP":
+        transport = paramiko.Transport((IP_URL_ADDRESS, 22))
+        transport.connect(username=LOGIN, password=PASSWORD)
+        sftp = MySFTPClient.from_transport(transport)
+        print("/sharedfolders/"+SAVEPATH + "/test")
+        sftp.mkdir("/sharedfolders/" + SAVEPATH + "/test", ignore_existing=True)
+        sftp.put_dir(DIRPATH, SAVEPATH + "/test")
+        sftp.close()
+directoryList=getpaths(DIRPATH)
+main()
