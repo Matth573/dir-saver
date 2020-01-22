@@ -36,7 +36,7 @@ def localCopy(src,dest):
     destination = shutil.copytree(src,dest)
     print(destination)
 
-from ftplib import FTP,FTP_TLS
+from ftplib import FTP,FTP_TLS,error_perm
 
 import os
 def copyftp(ftp,path):
@@ -107,24 +107,15 @@ def main():
 
     if METH == "FTPS" :
         logger.info("Copie en utilisant le protocole FTPS")
-        with FTP_TLS(IP_URL_ADDRESS,LOGIN,PASSWORD,SAVEPATH) as ftp:
+        try:
+            ftp = FTP(IP_URL_ADDRESS,LOGIN,PASSWORD,SAVEPATH)
+        except error_perm as e:
+            if str(e)[:3] == "550":
+                print("Le serveur requiert une connexion sur TLS")
+            else:
+                print(e)
+        else:
             goToDirectory(ftp,SAVEPATH)
-            d=datetime.now()
-            ftp.mkd(str(d))
-            ftp.cwd(str(d))
-            for directory in directoryList:
-                logger.info("Copie du dossier : "+directory)
-                nameDirectory = directory.split('/')[-1]
-                ftp.mkd(nameDirectory)
-                ftp.cwd(nameDirectory)
-                copyftp(ftp,directory)
-                ftp.cwd('..')
-    if METH == "FTP" : 
-        with FTP(IP_URL_ADDRESS,LOGIN,PASSWORD,SAVEPATH) as ftp:
-            goToDirectory(ftp,SAVEPATH)
-            print(len(ftp.nlst()))
-            print(ftp.nlst()[0])
-            #import pdb; pdb.set_trace()
             if len(ftp.nlst()) >= int(VERSIONNUMBER):
                 remove_ftp_dir(ftp, SAVEPATH + "/"+ftp.nlst()[0])
             d=datetime.now()
@@ -137,6 +128,32 @@ def main():
                 ftp.cwd(nameDirectory)
                 copyftp(ftp,directory)
                 ftp.cwd('..') 
+            ftp.close()
+
+    if METH == "FTP" : 
+        logger.info("Copie en utilisant le protocole FTP")
+        try:
+            ftp = FTP(IP_URL_ADDRESS,LOGIN,PASSWORD,SAVEPATH)
+        except error_perm as e:
+            if str(e)[:3] == "550":
+                print("Le serveur requiert une connexion sur TLS")
+            else:
+                print(e)
+        else:
+            goToDirectory(ftp,SAVEPATH)
+            if len(ftp.nlst()) >= int(VERSIONNUMBER):
+                remove_ftp_dir(ftp, SAVEPATH + "/"+ftp.nlst()[0])
+            d=datetime.now()
+            ftp.mkd(str(d))
+            ftp.cwd(str(d))
+            for directory in directoryList:
+                logger.info("Copie du dossier : "+directory)
+                nameDirectory = directory.split('/')[-1]
+                ftp.mkd(nameDirectory)
+                ftp.cwd(nameDirectory)
+                copyftp(ftp,directory)
+                ftp.cwd('..') 
+            ftp.close()
     if METH == "SFTP":
         transport = paramiko.Transport((IP_URL_ADDRESS, 22))
         transport.connect(username=LOGIN, password=PASSWORD)
