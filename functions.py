@@ -2,6 +2,7 @@ import os
 import sys
 import logging
 import paramiko
+import pdb
 from datetime import datetime
 
 logger = logging.getLogger('logger')
@@ -56,28 +57,16 @@ def copyftp(ftp,path):
             print("CWD", "..")
             ftp.cwd("..")
 
-class MySFTPClient(paramiko.SFTPClient):
-    def put_dir(self, source, target):
-        ''' Uploads the contents of the source directory to the target path. The
-            target directory needs to exists. All subdirectories in source are 
-            created under target.
-        '''
-        for item in os.listdir(source):
-            if os.path.isfile(os.path.join(source, item)):
-                self.put(os.path.join(source, item), '%s/%s' % (target, item))
-            else:
-                self.mkdir('%s/%s' % (target, item), ignore_existing=True)
-                self.put_dir(os.path.join(source, item), '%s/%s' % (target, item))
-
-    def mkdir(self, path, mode=511, ignore_existing=False):
-        ''' Augments mkdir by adding an option to not fail if the folder exists  '''
-        try:
-            super(MySFTPClient, self).mkdir(path, mode)
-        except IOError:
-            if ignore_existing:
-                pass
-            else:
-                raise
+def copyssh(ssh,path):
+    for name in os.listdir(path):
+        localpath = os.path.join(path,name)
+        if os.path.isfile(localpath):
+            ssh.put(localpath, name)
+        elif os.path.isdir(localpath):
+            ssh.mkdir(name)
+            ssh.chdir(name)
+            copyssh(ssh, localpath)
+            ssh.chdir('..')
 
 def remove_ftp_dir(ftp, path):
     for (name, properties) in ftp.mlsd(path=path):
@@ -89,6 +78,18 @@ def remove_ftp_dir(ftp, path):
             remove_ftp_dir(ftp, f"{path}/{name}")
     ftp.rmd(path)
 
+def removeDirectorySSH(ssh, path):
+    for item in ssh.listdir(path):
+        if item in ['.', '..']:
+            continue
+        else:
+            lstatout = str(ssh.lstat(item)).split()[0]
+            if 'd' in lstatout:
+                removeDirectorySSH(ssh,item)
+                ssh.rmdir(item)
+            else:
+                ssh.remove(item)
+
 def goToDirectory(ftp,path):
     listdir=path.split('/')
     if listdir[0]=='':
@@ -98,10 +99,15 @@ def goToDirectory(ftp,path):
             ftp.mkd(directory)
         ftp.cwd(directory)
 
-#client = paramiko.SSHClient()
-#client.load_system_host_keys()
-#client.set_missing_host_key_policy(paramiko.AutoAddPolicy)
-#client.connect(hostname, 21, username, password)
+def goToDirectorySSH(ssh,path):
+    listdir=path.split('/')
+    if listdir[0]=='':
+        listdir.remove('')
+    for directory in listdir:
+        if not directory in ssh.listdir():
+            ssh.mkdir(directory)
+        ssh.chdir(directory)
+
 
 def main():
 
@@ -155,12 +161,25 @@ def main():
                 ftp.cwd('..') 
             ftp.close()
     if METH == "SFTP":
-        transport = paramiko.Transport((IP_URL_ADDRESS, 22))
-        transport.connect(username=LOGIN, password=PASSWORD)
-        sftp = MySFTPClient.from_transport(transport)
-        print("/sharedfolders/"+SAVEPATH + "/test")
-        sftp.mkdir("/sharedfolders/" + SAVEPATH + "/test", ignore_existing=True)
-        sftp.put_dir(DIRPATH, SAVEPATH + "/test")
-        sftp.close()
+        ssh=paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(IP_URL_ADDRESS,22,LOGIN,PASSWORD)
+        ssh = ssh.open_sftp()
+        ssh.chdir("/sharedfolders/")
+        goToDirectorySSH(ssh,SAVEPATH)
+        if len(ssh.listdir()) >= int(VERSIONNUMBER):
+            removeDirectorySSH(ssh,ssh.listdir()[0])
+        d=datetime.now()
+        ssh.mkdir(str(d))
+        ssh.chdir(str(d))
+        for directory in directoryList:
+            logger.info("Copie du dossier : "+directory)
+            nameDirectory = directory.split('/')[-1]
+            ssh.mkdir(nameDirectory)
+            ssh.chdir(nameDirectory)
+            copyssh(ssh,directory)
+            ssh.chdir('..')
+        ssh.close()
+
 directoryList=getpaths(DIRPATH)
 main()
