@@ -79,6 +79,16 @@ class MySFTPClient(paramiko.SFTPClient):
             else:
                 raise
 
+def remove_ftp_dir(ftp, path):
+    for (name, properties) in ftp.mlsd(path=path):
+        if name in ['.', '..']:
+            continue
+        elif properties['type'] == 'file':
+            ftp.delete(f"{path}/{name}")
+        elif properties['type'] == 'dir':
+            remove_ftp_dir(ftp, f"{path}/{name}")
+    ftp.rmd(path)
+
 def goToDirectory(ftp,path):
     listdir=path.split('/')
     if listdir[0]=='':
@@ -112,6 +122,11 @@ def main():
     if METH == "FTP" : 
         with FTP(IP_URL_ADDRESS,LOGIN,PASSWORD,SAVEPATH) as ftp:
             goToDirectory(ftp,SAVEPATH)
+            print(len(ftp.nlst()))
+            print(ftp.nlst()[0])
+            #import pdb; pdb.set_trace()
+            if len(ftp.nlst()) >= int(VERSIONNUMBER):
+                remove_ftp_dir(ftp, SAVEPATH + "/"+ftp.nlst()[0])
             d=datetime.now()
             ftp.mkd(str(d))
             ftp.cwd(str(d))
