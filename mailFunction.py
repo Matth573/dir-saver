@@ -1,16 +1,19 @@
-import email, smtplib,ssl
+import email
+import smtplib
+import ssl
 
 from email import encoders
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
+
 def sendMail(subject, body, receiver):
     message = MIMEMultipart()
     message["From"] = "projet19info7@gmail.com"
     message["To"] = receiver
     message["Subject"] = subject
-    
+
     message.attach(MIMEText(body, "plain"))
 
     filename = "test.log"
@@ -22,9 +25,9 @@ def sendMail(subject, body, receiver):
     encoders.encode_base64(part)
 
     part.add_header(
-            "Content-Disposition",
-            f"attachment; filename= {filename}",
-        )
+        "Content-Disposition",
+        f"attachment; filename= {filename}",
+    )
 
     message.attach(part)
     text = message.as_string()
@@ -36,13 +39,15 @@ def sendMail(subject, body, receiver):
 
 #sendMail("Test Mail", "Ceci est mon premier mail envoyé avec python", "arthur.quef@gmail.com")
 
+
 def success():
-    sendMail("Copie réussie ! Directory_Saver", "Les dossiers ont bien été enregistré, vous trouverez les log en pièce jointe.", "arthur.quef@gmail.com")
+    sendMail("Copie réussie ! Directory_Saver",
+             "Les dossiers ont bien été enregistré, vous trouverez les log en pièce jointe.", "arthur.quef@gmail.com")
+
 
 def failure():
-    sendMail("Echec de la copie. Directory_Saver", "Il y a eu un problème lors de la copie. Cf les fichier de log en pièce jointe.", "arthur.quef@gmail.com")
+    sendMail("Echec de la copie. Directory_Saver",
+             "Il y a eu un problème lors de la copie. Cf les fichier de log en pièce jointe.", "arthur.quef@gmail.com")
+
 
 success()
-failure()
-
-

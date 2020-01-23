@@ -1,3 +1,6 @@
+from ftplib import FTP, FTP_TLS, error_perm
+from os import walk
+import shutil
 import os
 import sys
 import logging
@@ -6,47 +9,50 @@ import pdb
 from datetime import datetime
 from stat import S_ISDIR
 
-logger = logging.getLogger('logger')
-logger.setLevel(logging.INFO)
-fileHandler = logging.FileHandler('test.log')
-logger.addHandler(fileHandler)
-formatter = logging.Formatter('%(asctime)s  %(levelname)s: %(message)s')
-fileHandler.setFormatter(formatter)
+LOGGER = logging.getLogger('logger')
+LOGGER.setLevel(logging.INFO)
+FILEHANDLER = logging.FileHandler('test.log')
+LOGGER.addHandler(FILEHANDLER)
+FORMATTER = logging.Formatter('%(asctime)s  %(levelname)s: %(message)s')
+FILEHANDLER.setFormatter(FORMATTER)
 
-#Récupération des variables définies dans le fichier de conf:
-logger.info("Récupération des paramètres spécifiés dans le fichier de configuration")
-args=sys.argv
-DIRPATH=args[1]
-METH=args[2]
-IP_URL_ADDRESS=args[3]
-LOGIN=args[4]
-PASSWORD=args[5]
-SAVEPATH=args[6]
-NREP=args[7]
-VERSIONNUMBER=args[8]
+# Récupération des variables définies dans le fichier de conf:
+LOGGER.info(
+    "Récupération des paramètres spécifiés dans le fichier de configuration")
+ARGS = sys.argv
+DIRPATH = ARGS[1]
+METH = ARGS[2]
+IP_URL_ADDRESS = ARGS[3]
+LOGIN = ARGS[4]
+PASSWORD = ARGS[5]
+SAVEPATH = ARGS[6]
+NREP = ARGS[7]
+VERSIONNUMBER = ARGS[8]
 
 
-def getpaths(directoriesPath):
-    return directoriesPath.split(",")
+def get_paths(directories_path):
+    '''Fonction qui renvoie les chemins des différents répertoires à sauvegarder'''
+    return directories_path.split(",")
 
-from os import walk
-import shutil
-def localCopy(src,dest):
-    logger.info("Copie du dossier")
-    src='/Users/matthieu/Documents/Telecom/Semestre 7/Scripting System/test'
-    dest='/Users/matthieu/Documents/Telecom/Semestre 7/Scripting System/test6'
-    destination = shutil.copytree(src,dest)
+
+def local_copy(src, dest):
+    '''Fonction qui effectue la copie du dossier spécifié en locale dans le chemin de destination'''
+    LOGGER.info("Copie du dossier")
+    src = '/Users/matthieu/Documents/Telecom/Semestre 7/Scripting System/test'
+    dest = '/Users/matthieu/Documents/Telecom/Semestre 7/Scripting System/test6'
+    destination = shutil.copytree(src, dest)
     print(destination)
 
-from ftplib import FTP,FTP_TLS,error_perm
 
-import os
-def copyftp(ftp,path):
+def copy_ftp(ftp, path):
+    ''' Fonction qui copie le dossier indiqué par le chemin en paramètre en utilisant
+        le protocole ftp
+    '''
     for name in os.listdir(path):
-        localpath = os.path.join(path,name)
+        localpath = os.path.join(path, name)
         if os.path.isfile(localpath):
             print("STOR", name, localpath)
-            ftp.storbinary('STOR ' + name, open(localpath,'rb'))
+            ftp.storbinary('STOR ' + name, open(localpath, 'rb'))
         elif os.path.isdir(localpath):
             print("MKD", name)
 
@@ -54,62 +60,83 @@ def copyftp(ftp,path):
 
             print("CWD", name)
             ftp.cwd(name)
-            copyftp(ftp, localpath)
+            copy_ftp(ftp, localpath)
             print("CWD", "..")
             ftp.cwd("..")
 
-def copyssh(ssh,path):
+
+def copy_sftp(sftp, path):
+    ''' Fonction qui copie le dossier indiqué par le chemin en paramètre en utilisant
+        le protocole sftp
+    '''
     for name in os.listdir(path):
-        localpath = os.path.join(path,name)
+        localpath = os.path.join(path, name)
         if os.path.isfile(localpath):
-            ssh.put(localpath, name)
+            sftp.put(localpath, name)
         elif os.path.isdir(localpath):
-            ssh.mkdir(name)
-            ssh.chdir(name)
-            copyssh(ssh, localpath)
-            ssh.chdir('..')
+            sftp.mkdir(name)
+            sftp.chdir(name)
+            copy_sftp(sftp, localpath)
+            sftp.chdir('..')
+
 
 def remove_ftp_dir(ftp, path):
+    ''' Fonction qui supprime un dossier du serveur en utilisant le protocole ftp'''
     for (name, properties) in ftp.mlsd(path=path):
         if name in ['.', '..']:
             continue
-        elif properties['type'] == 'file':
+        if properties['type'] == 'file':
             ftp.delete(f"{path}/{name}")
         elif properties['type'] == 'dir':
             remove_ftp_dir(ftp, f"{path}/{name}")
     ftp.rmd(path)
 
-def isdir(sftp, path):
+
+def is_directory(sftp, path):
+    ''' Fonction qui vérifie si le dossier spécifié est un dossier en utilisant
+        le protocole sftp
+    '''
     try:
         return S_ISDIR(sftp.stat(path).st_mode)
     except IOError:
         return False
 
-def rm(sftp, path):
+
+def remove_directory(sftp, path):
+    ''' Fonction qui supprime un dossier en utilisant le protocole sftp'''
     files = sftp.listdir(path=path)
 
-    for f in files:
-        filepath = os.path.join(path, f)
-        if isdir(sftp,filepath):
-            rm(sftp,filepath)
+    for file in files:
+        filepath = os.path.join(path, file)
+        if is_directory(sftp, filepath):
+            remove_directory(sftp, filepath)
         else:
             sftp.remove(filepath)
 
     sftp.rmdir(path)
 
 
-def goToDirectory(ftp,path):
-    listdir=path.split('/')
-    if listdir[0]=='':
+def go_to_directory(ftp, path):
+    ''' Fonction qui permet de se déplacer dans le dossier voulu sur le serveur.
+        Si le chemin n'existe pas, la fonction créé les répertoires manquants.
+        Utilise le protocole ftp.
+    '''
+    listdir = path.split('/')
+    if listdir[0] == '':
         listdir.remove('')
     for directory in listdir:
         if not directory in ftp.nlst():
             ftp.mkd(directory)
         ftp.cwd(directory)
 
-def goToDirectorySSH(ssh,path):
-    listdir=path.split('/')
-    if listdir[0]=='':
+
+def go_to_directory_ssh(ssh, path):
+    ''' Fonction qui permet de se déplacer dans le dossier voulu sur le serveur.
+        Si le chemin n'existe pas, la fonction créé les répertoires manquants.
+        Utilise le protocole ftp.
+    '''
+    listdir = path.split('/')
+    if listdir[0] == '':
         listdir.remove('')
     for directory in listdir:
         if not directory in ssh.listdir():
@@ -118,76 +145,80 @@ def goToDirectorySSH(ssh,path):
 
 
 def main():
+    ''' Fonction main qui appelle les bonnes fonctions selon les paramètres renseigné
+        dans le fichier de configuration.
+    '''
 
-    if METH == "FTPS" :
-        logger.info("Copie en utilisant le protocole FTPS")
+    if METH == "FTPS":
+        LOGGER.info("Copie en utilisant le protocole FTPS")
         try:
-            ftp = FTP(IP_URL_ADDRESS,LOGIN,PASSWORD,SAVEPATH)
-        except error_perm as e:
-            if str(e)[:3] == "550":
+            ftp = FTP(IP_URL_ADDRESS, LOGIN, PASSWORD, SAVEPATH)
+        except error_perm as error:
+            if str(error)[:3] == "550":
                 print("Le serveur requiert une connexion sur TLS")
             else:
-                print(e)
+                print(error)
         else:
-            goToDirectory(ftp,SAVEPATH)
+            go_to_directory(ftp, SAVEPATH)
             if len(ftp.nlst()) >= int(VERSIONNUMBER):
-                remove_ftp_dir(ftp, SAVEPATH + "/"+ftp.nlst()[0])
-            d=datetime.now()
-            ftp.mkd(str(d))
-            ftp.cwd(str(d))
+                remove_ftp_dir(ftp, SAVEPATH + "/" + ftp.nlst()[0])
+            date_heure = datetime.now()
+            ftp.mkd(str(date_heure))
+            ftp.cwd(str(date_heure))
             for directory in directoryList:
-                logger.info("Copie du dossier : "+directory)
-                nameDirectory = directory.split('/')[-1]
-                ftp.mkd(nameDirectory)
-                ftp.cwd(nameDirectory)
-                copyftp(ftp,directory)
-                ftp.cwd('..') 
+                LOGGER.info("Copie du dossier : %s", directory)
+                name_directory = directory.split('/')[-1]
+                ftp.mkd(name_directory)
+                ftp.cwd(name_directory)
+                copy_ftp(ftp, directory)
+                ftp.cwd('..')
             ftp.close()
 
-    if METH == "FTP" : 
-        logger.info("Copie en utilisant le protocole FTP")
+    if METH == "FTP":
+        LOGGER.info("Copie en utilisant le protocole FTP")
         try:
-            ftp = FTP(IP_URL_ADDRESS,LOGIN,PASSWORD,SAVEPATH)
-        except error_perm as e:
-            if str(e)[:3] == "550":
+            ftp = FTP(IP_URL_ADDRESS, LOGIN, PASSWORD, SAVEPATH)
+        except error_perm as error:
+            if str(error)[:3] == "550":
                 print("Le serveur requiert une connexion sur TLS")
             else:
-                print(e)
+                print(error)
         else:
-            goToDirectory(ftp,SAVEPATH)
+            go_to_directory(ftp, SAVEPATH)
             if len(ftp.nlst()) >= int(VERSIONNUMBER):
-                remove_ftp_dir(ftp, SAVEPATH + "/"+ftp.nlst()[0])
-            d=datetime.now()
-            ftp.mkd(str(d))
-            ftp.cwd(str(d))
+                remove_ftp_dir(ftp, SAVEPATH + "/" + ftp.nlst()[0])
+            date_heure = datetime.now()
+            ftp.mkd(str(date_heure))
+            ftp.cwd(str(date_heure))
             for directory in directoryList:
-                logger.info("Copie du dossier : "+directory)
-                nameDirectory = directory.split('/')[-1]
-                ftp.mkd(nameDirectory)
-                ftp.cwd(nameDirectory)
-                copyftp(ftp,directory)
-                ftp.cwd('..') 
+                LOGGER.info("Copie du dossier : %s", directory)
+                name_directory = directory.split('/')[-1]
+                ftp.mkd(name_directory)
+                ftp.cwd(name_directory)
+                copy_ftp(ftp, directory)
+                ftp.cwd('..')
             ftp.close()
     if METH == "SFTP":
-        ssh=paramiko.SSHClient()
+        ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect(IP_URL_ADDRESS,22,LOGIN,PASSWORD)
+        ssh.connect(IP_URL_ADDRESS, 22, LOGIN, PASSWORD)
         sftp = ssh.open_sftp()
         sftp.chdir("/sharedfolders/")
-        goToDirectorySSH(sftp,SAVEPATH)
+        go_to_directory_ssh(sftp, SAVEPATH)
         if len(sftp.listdir()) >= int(VERSIONNUMBER):
-            rm(sftp,sftp.listdir()[0])
-        d=datetime.now()
-        sftp.mkdir(str(d))
-        sftp.chdir(str(d))
+            remove_directory(sftp, sftp.listdir()[0])
+        date_heure = datetime.now()
+        sftp.mkdir(str(date_heure))
+        sftp.chdir(str(date_heure))
         for directory in directoryList:
-            logger.info("Copie du dossier : "+directory)
-            nameDirectory = directory.split('/')[-1]
-            sftp.mkdir(nameDirectory)
-            sftp.chdir(nameDirectory)
-            copyssh(sftp,directory)
+            LOGGER.info("Copie du dossier : " + directory)
+            name_directory = directory.split('/')[-1]
+            sftp.mkdir(name_directory)
+            sftp.chdir(name_directory)
+            copy_sftp(sftp, directory)
             sftp.chdir('..')
         ssh.close()
 
-directoryList=getpaths(DIRPATH)
+
+directoryList = get_paths(DIRPATH)
 main()
