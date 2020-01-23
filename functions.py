@@ -4,6 +4,7 @@ import logging
 import paramiko
 import pdb
 from datetime import datetime
+from stat import S_ISDIR
 
 logger = logging.getLogger('logger')
 logger.setLevel(logging.INFO)
@@ -78,17 +79,24 @@ def remove_ftp_dir(ftp, path):
             remove_ftp_dir(ftp, f"{path}/{name}")
     ftp.rmd(path)
 
-def removeDirectorySSH(ssh, path):
-    for item in ssh.listdir(path):
-        if item in ['.', '..']:
-            continue
+def isdir(sftp, path):
+    try:
+        return S_ISDIR(sftp.stat(path).st_mode)
+    except IOError:
+        return False
+
+def rm(sftp, path):
+    files = sftp.listdir(path=path)
+
+    for f in files:
+        filepath = os.path.join(path, f)
+        if isdir(sftp,filepath):
+            rm(sftp,filepath)
         else:
-            lstatout = str(ssh.lstat(item)).split()[0]
-            if 'd' in lstatout:
-                removeDirectorySSH(ssh,item)
-                ssh.rmdir(item)
-            else:
-                ssh.remove(item)
+            sftp.remove(filepath)
+
+    sftp.rmdir(path)
+
 
 def goToDirectory(ftp,path):
     listdir=path.split('/')
@@ -164,21 +172,21 @@ def main():
         ssh=paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh.connect(IP_URL_ADDRESS,22,LOGIN,PASSWORD)
-        ssh = ssh.open_sftp()
-        ssh.chdir("/sharedfolders/")
-        goToDirectorySSH(ssh,SAVEPATH)
-        if len(ssh.listdir()) >= int(VERSIONNUMBER):
-            removeDirectorySSH(ssh,ssh.listdir()[0])
+        sftp = ssh.open_sftp()
+        sftp.chdir("/sharedfolders/")
+        goToDirectorySSH(sftp,SAVEPATH)
+        if len(sftp.listdir()) >= int(VERSIONNUMBER):
+            rm(sftp,sftp.listdir()[0])
         d=datetime.now()
-        ssh.mkdir(str(d))
-        ssh.chdir(str(d))
+        sftp.mkdir(str(d))
+        sftp.chdir(str(d))
         for directory in directoryList:
             logger.info("Copie du dossier : "+directory)
             nameDirectory = directory.split('/')[-1]
-            ssh.mkdir(nameDirectory)
-            ssh.chdir(nameDirectory)
-            copyssh(ssh,directory)
-            ssh.chdir('..')
+            sftp.mkdir(nameDirectory)
+            sftp.chdir(nameDirectory)
+            copyssh(sftp,directory)
+            sftp.chdir('..')
         ssh.close()
 
 directoryList=getpaths(DIRPATH)
