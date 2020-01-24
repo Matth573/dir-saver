@@ -154,7 +154,7 @@ def version_handler(client):
     '''
     date_heure = datetime.now()
     date_heure = str(date_heure)
-    if METH == "FTPS" or METH == "FTP":
+    if METH in ('FTPS', 'FTP'):
         if int(VERSIONNUMBER) > 0:
             if len(client.nlst()) >= int(VERSIONNUMBER):
                 LOGGER.info(
@@ -202,7 +202,7 @@ def main2():
             error = True
     else:
         version_handler(client)
-        if METH == "FTPS" or METH == "FTP":
+        if METH in ('FTPS', 'FTP'):
             for directory in DIRECTORY_LIST:
                 LOGGER.info("Copie du dossier : %s", directory)
                 name_directory = directory.split('/')[-1]
@@ -219,89 +219,6 @@ def main2():
                 copy_sftp(client, directory)
                 client.chdir('..')
         client.close()
-
-def main():
-    ''' Fonction main qui appelle les bonnes fonctions selon les paramètres renseigné
-        dans le fichier de configuration.
-    '''
-    error = False
-    if METH == "FTPS":
-        LOGGER.info("Copie en utilisant le protocole FTPS")
-        try:
-            ftp = FTP_TLS(IP_URL_ADDRESS, LOGIN, PASSWORD)
-        except error_perm as error:
-            if str(error)[:3] == "550":
-                LOGGER.warning("Le serveur requiert une connexion sur TLS")
-                error = True
-            else:
-                LOGGER.error(error)
-                error = True
-        else:
-            go_to_directory_ftp(ftp, SAVEPATH)
-            if len(ftp.nlst()) >= int(VERSIONNUMBER):
-                LOGGER.info(
-                    "Nombre maximale de dossier sauvegardé atteint. Suppressionde la plus vieille sauvegarde")
-                remove_ftp_dir(ftp, SAVEPATH + "/" + ftp.nlst()[0])
-            date_heure = datetime.now()
-            ftp.mkd(str(date_heure))
-            ftp.cwd(str(date_heure))
-            for directory in DIRECTORY_LIST:
-                LOGGER.info("Copie du dossier : %s", directory)
-                name_directory = directory.split('/')[-1]
-                ftp.mkd(name_directory)
-                ftp.cwd(name_directory)
-                copy_ftp(ftp, directory)
-                ftp.cwd('..')
-            ftp.close()
-
-    if METH == "FTP":
-        LOGGER.info("Copie en utilisant le protocole FTP")
-        try:
-            ftp = FTP(IP_URL_ADDRESS, LOGIN, PASSWORD)
-        except error_perm as error:
-            if str(error)[:3] == "550":
-                print("Le serveur requiert une connexion sur TLS")
-            else:
-                print(error)
-        else:
-            go_to_directory_ftp(ftp, SAVEPATH)
-            if len(ftp.nlst()) >= int(VERSIONNUMBER):
-                remove_ftp_dir(ftp, SAVEPATH + "/" + ftp.nlst()[0])
-            date_heure = datetime.now()
-            ftp.mkd(str(date_heure))
-            ftp.cwd(str(date_heure))
-            for directory in DIRECTORY_LIST:
-                LOGGER.info("Copie du dossier : %s", directory)
-                name_directory = directory.split('/')[-1]
-                ftp.mkd(name_directory)
-                ftp.cwd(name_directory)
-                copy_ftp(ftp, directory)
-                ftp.cwd('..')
-            ftp.close()
-    if METH == "SFTP":
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        try:
-            ssh.connect(IP_URL_ADDRESS, 22, LOGIN, PASSWORD)
-        except TimeoutError as error:
-            LOGGER.warning("La connexion au serveur a échoué")
-        else:
-            sftp = ssh.open_sftp()
-            sftp.chdir("/sharedfolders/")
-            go_to_directory_sftp(sftp, SAVEPATH)
-            if len(sftp.listdir()) >= int(VERSIONNUMBER):
-                remove_directory_sftp(sftp, sftp.listdir()[0])
-            date_heure = datetime.now()
-            sftp.mkdir(str(date_heure))
-            sftp.chdir(str(date_heure))
-            for directory in DIRECTORY_LIST:
-                LOGGER.info("Copie du dossier : %s", directory)
-                name_directory = directory.split('/')[-1]
-                sftp.mkdir(name_directory)
-                sftp.chdir(name_directory)
-                copy_sftp(sftp, directory)
-                sftp.chdir('..')
-            ssh.close()
 
 
 DIRECTORY_LIST = get_paths(DIRPATH)
