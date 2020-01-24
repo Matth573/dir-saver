@@ -10,6 +10,7 @@ from email.mime.text import MIMEText
 
 
 def config_init():
+    ''' Fonction qui récupère les paramètre du fichier de configuration'''
     config = configparser.RawConfigParser()
     config.read('config.ini')
     return config
@@ -19,16 +20,16 @@ def send_mail(subject, body):
     ''' Fonction qui envoie un mail au destinataire avec l'objet et le corps en paramètre
     '''
     config = config_init()
-    FROM_ADDRESS = config.get('mail', 'smtp_host_email_address')
-    TO_ADDRESS = config.get('mail', 'send_to')
-    SMTP_URL = config.get('mail', 'smtp_host')
-    SMTP_PORT = config.get('mail', 'smtp_port')
-    PASSWORD = config.get('mail', 'smtp_password')
-    LOG_ON = config.get('directories', 'log_attached')
+    from_address = config.get('mail', 'smtp_host_email_address')
+    to_address = config.get('mail', 'send_to')
+    smtp_url = config.get('mail', 'smtp_host')
+    smtp_port = config.get('mail', 'smtp_port')
+    password = config.get('mail', 'smtp_password')
+    log_on = config.get('directories', 'log_attached')
 
     message = MIMEMultipart()
-    message["From"] = FROM_ADDRESS
-    message["To"] = TO_ADDRESS
+    message["From"] = from_address
+    message["To"] = to_address
     message["Subject"] = subject
 
     message.attach(MIMEText(body, "plain"))
@@ -50,9 +51,9 @@ def send_mail(subject, body):
     text = message.as_string()
 
     context = ssl.create_default_context()
-    with smtplib.SMTP_SSL(SMTP_URL, SMTP_PORT, context=context) as server:
-        server.login(FROM_ADDRESS, PASSWORD)
-        server.sendmail(FROM_ADDRESS, TO_ADDRESS, text)
+    with smtplib.SMTP_SSL(smtp_url, smtp_port, context=context) as server:
+        server.login(from_address, password)
+        server.sendmail(from_address, to_address, text)
 
 #sendMail("Test Mail", "Ceci est mon premier mail envoyé avec python", "arthur.quef@gmail.com")
 
@@ -66,8 +67,7 @@ def success():
 def failure():
     ''' Fonction qui envoie un mail disant qu'il y a eu un problème lors de la copie'''
     send_mail("Echec de la copie. Directory_Saver",
-              "Il y a eu un problème lors de la copie. Cf les fichier de log en pièce jointe.",
-              "arthur.quef@gmail.com")
+              "Il y a eu un problème lors de la copie. Cf les fichier de log en pièce jointe.")
 
 
 success()
