@@ -2,19 +2,32 @@
 
 import smtplib
 import ssl
-
+import configparser
 from email import encoders
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 
-def send_mail(subject, body, receiver):
+def config_init():
+    config = configparser.RawConfigParser()
+    config.read('config.ini')
+    return config
+
+
+def send_mail(subject, body):
     ''' Fonction qui envoie un mail au destinataire avec l'objet et le corps en paramètre
     '''
+    config = config_init()
+    FROM_ADDRESS = config.get('mail', 'smtp_host_email_address')
+    TO_ADDRESS = config.get('mail', 'send_to')
+    SMTP_URL = config.get('mail', 'smtp_host')
+    SMTP_PORT = config.get('mail', 'smtp_port')
+    PASSWORD = config.get('mail', 'smtp_password')
+
     message = MIMEMultipart()
-    message["From"] = "projet19info7@gmail.com"
-    message["To"] = receiver
+    message["From"] = FROM_ADDRESS
+    message["To"] = TO_ADDRESS
     message["Subject"] = subject
 
     message.attach(MIMEText(body, "plain"))
@@ -36,9 +49,9 @@ def send_mail(subject, body, receiver):
     text = message.as_string()
 
     context = ssl.create_default_context()
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
-        server.login("projet19info7@gmail.com", "c!%NL6Fy6sZN")
-        server.sendmail("projet19info7@gmail.com", receiver, text)
+    with smtplib.SMTP_SSL(SMTP_URL, SMTP_PORT, context=context) as server:
+        server.login(FROM_ADDRESS, PASSWORD)
+        server.sendmail(FROM_ADDRESS, TO_ADDRESS, text)
 
 #sendMail("Test Mail", "Ceci est mon premier mail envoyé avec python", "arthur.quef@gmail.com")
 
@@ -46,8 +59,7 @@ def send_mail(subject, body, receiver):
 def success():
     ''' Fonction qui envoie un mail disant que la copie des dossiers s'est bien passé'''
     send_mail("Copie réussie ! Directory_Saver",
-              "Les dossiers ont bien été enregistré, vous trouverez les log en pièce jointe.",
-              "arthur.quef@gmail.com")
+              "Les dossiers ont bien été enregistré, vous trouverez les log en pièce jointe.")
 
 
 def failure():

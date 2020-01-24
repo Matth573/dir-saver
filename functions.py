@@ -11,12 +11,12 @@ import sys
 import logging
 import paramiko
 
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s  %(levelname)s: %(message)s',
+                    datefmt='%d-%m %H:%M',
+                    filename='dir-saver.log',
+                    filemode='w')
 LOGGER = logging.getLogger('logger')
-LOGGER.setLevel(logging.INFO)
-FILEHANDLER = logging.FileHandler('test.log')
-LOGGER.addHandler(FILEHANDLER)
-FORMATTER = logging.Formatter('%(asctime)s  %(levelname)s: %(message)s')
-FILEHANDLER.setFormatter(FORMATTER)
 
 LOGGER.info(
     "Récupération des paramètres spécifiés dans le fichier de configuration")
@@ -174,7 +174,7 @@ def version_handler(client):
         client.chdir(date_heure)
 
 
-def main2():
+def main():
     ''' Fonction main qui appelle les bonnes fonctions selon les paramètres renseigné
         dans le fichier de configuration.
     '''
@@ -222,4 +222,4 @@ def main2():
 
 
 DIRECTORY_LIST = get_paths(DIRPATH)
-main2()
+main()
