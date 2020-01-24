@@ -1,4 +1,5 @@
-import email
+''' Module qui contient les fonctions pour envoyer des mails à l'utilisateur'''
+
 import smtplib
 import ssl
 
@@ -8,7 +9,9 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 
-def sendMail(subject, body, receiver):
+def send_mail(subject, body, receiver):
+    ''' Fonction qui envoie un mail au destinataire avec l'objet et le corps en paramètre
+    '''
     message = MIMEMultipart()
     message["From"] = "projet19info7@gmail.com"
     message["To"] = receiver
@@ -41,13 +44,17 @@ def sendMail(subject, body, receiver):
 
 
 def success():
-    sendMail("Copie réussie ! Directory_Saver",
-             "Les dossiers ont bien été enregistré, vous trouverez les log en pièce jointe.", "arthur.quef@gmail.com")
+    ''' Fonction qui envoie un mail disant que la copie des dossiers s'est bien passé'''
+    send_mail("Copie réussie ! Directory_Saver",
+              "Les dossiers ont bien été enregistré, vous trouverez les log en pièce jointe.",
+              "arthur.quef@gmail.com")
 
 
 def failure():
-    sendMail("Echec de la copie. Directory_Saver",
-             "Il y a eu un problème lors de la copie. Cf les fichier de log en pièce jointe.", "arthur.quef@gmail.com")
+    ''' Fonction qui envoie un mail disant qu'il y a eu un problème lors de la copie'''
+    send_mail("Echec de la copie. Directory_Saver",
+              "Il y a eu un problème lors de la copie. Cf les fichier de log en pièce jointe.",
+              "arthur.quef@gmail.com")
 
 
 success()
