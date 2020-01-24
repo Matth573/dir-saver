@@ -7,9 +7,10 @@ from datetime import datetime
 from stat import S_ISDIR
 import shutil
 import os
-import sys
 import logging
+import configparser
 import paramiko
+
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s  %(levelname)s: %(message)s',
@@ -20,15 +21,22 @@ LOGGER = logging.getLogger('logger')
 
 LOGGER.info(
     "Récupération des paramètres spécifiés dans le fichier de configuration")
-ARGS = sys.argv
-DIRPATH = ARGS[1]
-METH = ARGS[2]
-IP_URL_ADDRESS = ARGS[3]
-LOGIN = ARGS[4]
-PASSWORD = ARGS[5]
-SAVEPATH = ARGS[6]
-NREP = ARGS[7]
-VERSIONNUMBER = ARGS[8]
+
+
+CONFIG = configparser.ConfigParser()
+CONFIG.read('config.ini')
+DIRECTORIES_TO_SAVE = CONFIG.get('directories', 'directories_to_save')
+WITH_FTP = CONFIG.get('save_method', 'with_ftp')
+WITH_FTPS = CONFIG.get('save_method', 'with_ftps')
+WITH_SFTP = CONFIG.get('save_method', 'WITH_SFTP')
+WITH_LOCAL_SAVE = CONFIG.get('save_method', 'with_local_save')
+IP_URL_ADDRESS = CONFIG.get('connection_parameters', 'ip_url_address')
+LOGIN = CONFIG.get('connection_parameters', 'login')
+PASSWORD = CONFIG.get('connection_parameters', 'password')
+BACKUP_DIRECTORY = CONFIG.get('directories', 'backup_directory')
+VERSION_CONTROL = CONFIG.get('version_handler', 'version_control')
+VERSION_NUMBER = CONFIG.get('version_handler', 'version_number')
+MAIL_ON = CONFIG.get('mail', 'get_mail')
 
 
 def get_paths(directories_path):
@@ -154,18 +162,18 @@ def version_handler(client):
     '''
     date_heure = datetime.now()
     date_heure = str(date_heure)
-    if METH in ('FTPS', 'FTP'):
-        if int(VERSIONNUMBER) > 0:
-            if len(client.nlst()) >= int(VERSIONNUMBER):
+    if WITH_FTP or WITH_FTPS:
+        if int(VERSION_NUMBER) > 0:
+            if len(client.nlst()) >= int(VERSION_NUMBER):
                 LOGGER.info(
                     "Nombre maximale de dossier sauvegardé atteint. Suppression de la plus vieille sauvegarde")
                 LOGGER.info("Suppression du dossier %s", client.nlst()[0])
-                remove_ftp_dir(client, SAVEPATH + "/" + client.nlst()[0])
+                remove_ftp_dir(client, BACKUP_DIRECTORY + "/" + client.nlst()[0])
         client.mkd(date_heure)
         client.cwd(date_heure)
-    elif METH == "SFTP":
-        if int(VERSIONNUMBER) > 0:
-            if len(client.listdir()) >= int(VERSIONNUMBER):
+    elif WITH_SFTP:
+        if int(VERSION_NUMBER) > 0:
+            if len(client.listdir()) >= int(VERSION_NUMBER):
                 LOGGER.info(
                     "Nombre maximale de dossier sauvegardé atteint. Suppression de la plus vieille sauvegarde")
                 LOGGER.info("Suppression du dossier %s", client.listdir()[0])
@@ -180,19 +188,19 @@ def main():
     '''
     error = False
     try:
-        if METH == "FTPS":
-            client = FTP_TLS(IP_URL_ADDRESS, LOGIN, PASSWORD, SAVEPATH)
-            go_to_directory_ftp(client, SAVEPATH)
-        elif METH == "FTP":
-            client = FTP(IP_URL_ADDRESS, LOGIN, PASSWORD, SAVEPATH)
-            go_to_directory_ftp(client, SAVEPATH)
-        elif METH == "SFTP":
+        if WITH_FTPS:
+            client = FTP_TLS(IP_URL_ADDRESS, LOGIN, PASSWORD, BACKUP_DIRECTORY)
+            go_to_directory_ftp(client, BACKUP_DIRECTORY)
+        elif WITH_FTP:
+            client = FTP(IP_URL_ADDRESS, LOGIN, PASSWORD, BACKUP_DIRECTORY)
+            go_to_directory_ftp(client, BACKUP_DIRECTORY)
+        elif WITH_SFTP:
             ssh = paramiko.SSHClient()
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             ssh.connect(IP_URL_ADDRESS, 22, LOGIN, PASSWORD)
             client = ssh.open_sftp()
             client.chdir("/sharedfolders/")
-            go_to_directory_sftp(client, SAVEPATH)
+            go_to_directory_sftp(client, BACKUP_DIRECTORY)
     except error_perm as error:
         if str(error)[:3] == "550":
             LOGGER.warning("Le serveur requiert une connexion sur TLS")
@@ -202,7 +210,7 @@ def main():
             error = True
     else:
         version_handler(client)
-        if METH in ('FTPS', 'FTP'):
+        if WITH_FTP or WITH_FTPS:
             for directory in DIRECTORY_LIST:
                 LOGGER.info("Copie du dossier : %s", directory)
                 name_directory = directory.split('/')[-1]
@@ -210,7 +218,7 @@ def main():
                 client.cwd(name_directory)
                 copy_ftp(client, directory)
                 client.cwd('..')
-        elif METH == "SFTP":
+        elif WITH_SFTP:
             for directory in DIRECTORY_LIST:
                 LOGGER.info("Copie du dossier : %s", directory)
                 name_directory = directory.split('/')[-1]
@@ -221,5 +229,5 @@ def main():
         client.close()
 
 
-DIRECTORY_LIST = get_paths(DIRPATH)
+DIRECTORY_LIST = get_paths(DIRECTORIES_TO_SAVE)
 main()

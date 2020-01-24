@@ -24,6 +24,7 @@ def send_mail(subject, body):
     SMTP_URL = config.get('mail', 'smtp_host')
     SMTP_PORT = config.get('mail', 'smtp_port')
     PASSWORD = config.get('mail', 'smtp_password')
+    LOG_ON = config.get('directories', 'log_attached')
 
     message = MIMEMultipart()
     message["From"] = FROM_ADDRESS
