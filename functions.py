@@ -36,7 +36,13 @@ PASSWORD = CONFIG.get('connection_parameters', 'password')
 BACKUP_DIRECTORY = CONFIG.get('directories', 'backup_directory')
 VERSION_CONTROL = CONFIG.get('version_handler', 'version_control')
 VERSION_NUMBER = CONFIG.get('version_handler', 'version_number')
+VERSION_FORMAT = CONFIG.get('version_handler', 'format')
 MAIL_ON = CONFIG.get('mail', 'get_mail')
+nb_file_save = 0
+size_save = 0
+directories_saved = 0
+name_directory = None
+directory_removed = None
 
 
 def get_paths(directories_path):
@@ -46,11 +52,8 @@ def get_paths(directories_path):
 
 def local_copy(src, dest):
     '''Fonction qui effectue la copie du dossier spécifié en locale dans le chemin de destination'''
-    LOGGER.info("Copie du dossier")
-    src = '/Users/matthieu/Documents/Telecom/Semestre 7/Scripting System/test'
-    dest = '/Users/matthieu/Documents/Telecom/Semestre 7/Scripting System/test6'
-    destination = shutil.copytree(src, dest)
-    print(destination)
+    LOGGER.info("Copie du dossier %s", src.split('/')[-1])
+    shutil.copytree(src, dest)
 
 
 def copy_ftp(ftp, path):
@@ -60,17 +63,15 @@ def copy_ftp(ftp, path):
     for name in os.listdir(path):
         localpath = os.path.join(path, name)
         if os.path.isfile(localpath):
-            print("STOR", name, localpath)
+            LOGGER.info("Copie du fichier %s", localpath)
             ftp.storbinary('STOR ' + name, open(localpath, 'rb'))
+            global nb_file_save 
+            nb_file_save += 1
         elif os.path.isdir(localpath):
-            print("MKD", name)
-
+            LOGGER.info("Copie du dossier %s", localpath)
             ftp.mkd(name)
-
-            print("CWD", name)
             ftp.cwd(name)
             copy_ftp(ftp, localpath)
-            print("CWD", "..")
             ftp.cwd("..")
 
 
@@ -82,7 +83,10 @@ def copy_sftp(sftp, path):
         localpath = os.path.join(path, name)
         if os.path.isfile(localpath):
             sftp.put(localpath, name)
+            LOGGER.info("Copie du fichier %s", localpath)
+            nb_file_save += 1
         elif os.path.isdir(localpath):
+            LOGGER.info("Copie du dossier %s", localpath)
             sftp.mkdir(name)
             sftp.chdir(name)
             copy_sftp(sftp, localpath)
@@ -114,14 +118,12 @@ def is_directory(sftp, path):
 def remove_directory_sftp(sftp, path):
     ''' Fonction qui supprime un dossier en utilisant le protocole sftp'''
     files = sftp.listdir(path=path)
-
     for file in files:
         filepath = os.path.join(path, file)
         if is_directory(sftp, filepath):
             remove_directory_sftp(sftp, filepath)
         else:
             sftp.remove(filepath)
-
     sftp.rmdir(path)
 
 
@@ -130,11 +132,14 @@ def go_to_directory_ftp(ftp, path):
         Si le chemin n'existe pas, la fonction créé les répertoires manquants.
         Utilise le protocole ftp.
     '''
+    LOGGER.info("Déplacement jusqu'au dossier : %s", path)
     listdir = path.split('/')
     if listdir[0] == '':
         listdir.remove('')
     for directory in listdir:
         if not directory in ftp.nlst():
+            LOGGER.info(
+                "Le dossier %s n'existe pas, création du dossier", directory)
             ftp.mkd(directory)
         ftp.cwd(directory)
 
@@ -155,31 +160,51 @@ def go_to_directory_sftp(sftp, path):
             sftp.mkdir(directory)
         sftp.chdir(directory)
 
+def get_last_number_sftp(client):
+    ''' Fonction qui résupère le dernier nombre utilisé pour faire une sauvegarde avec sftp'''
+    if len(client.listdir()) != 0:
+        return max([int(i) for i in client.listdir()])
+    else:
+        return 0
+
+def get_last_number_ftp(client):
+    ''' Fonction qui résupère le dernier nombre utilisé pour faire une sauvegarde avec ftp'''
+    if len(client.nlst()) != 0:
+        return max([int(i) for i in client.nlst()])
+    else:
+        return 0
 
 def version_handler(client):
     ''' Fonction qui vérifie s'il faut gérer le nombre de sauvegarde à garder
         sur le serveur et qui supprime des sauvegardes si besoin
     '''
-    date_heure = datetime.now()
-    date_heure = str(date_heure)
+    if VERSION_FORMAT == "date":
+        name_directory = str(datetime.now())
+    elif VERSION_FORMAT == "number":
+        if WITH_FTP or WITH_FTPS:
+            name_directory = str(get_last_number_ftp(client) + 1)
+        elif WITH_SFTP:
+            name_directory = str(get_last_number_sftp(client) + 1)
     if WITH_FTP or WITH_FTPS:
         if int(VERSION_NUMBER) > 0:
             if len(client.nlst()) >= int(VERSION_NUMBER):
                 LOGGER.info(
                     "Nombre maximale de dossier sauvegardé atteint. Suppression de la plus vieille sauvegarde")
                 LOGGER.info("Suppression du dossier %s", client.nlst()[0])
+                directory_removed = client.nlst()[0]
                 remove_ftp_dir(client, BACKUP_DIRECTORY + "/" + client.nlst()[0])
-        client.mkd(date_heure)
-        client.cwd(date_heure)
+        client.mkd(name_directory)
+        client.cwd(name_directory)
     elif WITH_SFTP:
         if int(VERSION_NUMBER) > 0:
             if len(client.listdir()) >= int(VERSION_NUMBER):
                 LOGGER.info(
                     "Nombre maximale de dossier sauvegardé atteint. Suppression de la plus vieille sauvegarde")
                 LOGGER.info("Suppression du dossier %s", client.listdir()[0])
+                directory_removed = client.listdir()[0]
                 remove_directory_sftp(client, client.listdir()[0])
-        client.mkdir(date_heure)
-        client.chdir(date_heure)
+        client.mkdir(name_directory)
+        client.chdir(name_directory)
 
 
 def main():
