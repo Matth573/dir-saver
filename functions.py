@@ -65,7 +65,7 @@ def copy_ftp(ftp, path):
         if os.path.isfile(localpath):
             LOGGER.info("Copie du fichier %s", localpath)
             ftp.storbinary('STOR ' + name, open(localpath, 'rb'))
-            global nb_file_save 
+            global nb_file_save
             nb_file_save += 1
         elif os.path.isdir(localpath):
             LOGGER.info("Copie du dossier %s", localpath)
@@ -186,13 +186,19 @@ def version_handler(client):
         elif WITH_SFTP:
             name_directory = str(get_last_number_sftp(client) + 1)
     if WITH_FTP or WITH_FTPS:
-        if int(VERSION_NUMBER) > 0:
+        if VERSION_CONTROL:
             if len(client.nlst()) >= int(VERSION_NUMBER):
-                LOGGER.info(
-                    "Nombre maximale de dossier sauvegardé atteint. Suppression de la plus vieille sauvegarde")
-                LOGGER.info("Suppression du dossier %s", client.nlst()[0])
-                directory_removed = client.nlst()[0]
-                remove_ftp_dir(client, BACKUP_DIRECTORY + "/" + client.nlst()[0])
+                    LOGGER.info(
+                        "Nombre maximale de dossier sauvegardé atteint. Suppression de la plus vieille sauvegarde")
+                    if VERSION_FORMAT == "date":
+                        LOGGER.info("Suppression du dossier %s", client.nlst()[0])
+                        directory_removed = client.nlst()[0]
+                        remove_ftp_dir(client, BACKUP_DIRECTORY + "/" + client.nlst()[0])
+                    elif VERSION_FORMAT == "number":
+                        directory_removed = min([int(i) for i in client.nlst()])
+                        LOGGER.info("Suppression du dossier %s", directory_removed)
+                        remove_ftp_dir(client, BACKUP_DIRECTORY + "/" + str(directory_removed))
+        LOGGER.info("Création du dossier de sauvegarde : %s", name_directory)
         client.mkd(name_directory)
         client.cwd(name_directory)
     elif WITH_SFTP:
@@ -203,6 +209,7 @@ def version_handler(client):
                 LOGGER.info("Suppression du dossier %s", client.listdir()[0])
                 directory_removed = client.listdir()[0]
                 remove_directory_sftp(client, client.listdir()[0])
+        LOGGER.info("Création du dossier de sauvegarde : %s", name_directory)
         client.mkdir(name_directory)
         client.chdir(name_directory)
 
