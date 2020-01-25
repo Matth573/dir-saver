@@ -13,6 +13,7 @@ import logging
 import configparser
 import mail_function as mail
 import paramiko
+import verif_config
 
 
 logging.basicConfig(level=logging.INFO,
@@ -238,12 +239,15 @@ def main():
     global directory_removed
     try:
         if WITH_FTPS:
+            LOGGER.info("Utilisation du protocole FTPS")
             client = FTP_TLS(IP_URL_ADDRESS, LOGIN, PASSWORD, BACKUP_DIRECTORY)
             go_to_directory_ftp(client, BACKUP_DIRECTORY)
         elif WITH_FTP:
+            LOGGER.info("Utilisation du protocole FTP")
             client = FTP(IP_URL_ADDRESS, LOGIN, PASSWORD, BACKUP_DIRECTORY)
             go_to_directory_ftp(client, BACKUP_DIRECTORY)
         elif WITH_SFTP:
+            LOGGER.info("Utilisation du protocole SFTP")
             ssh = paramiko.SSHClient()
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             ssh.connect(IP_URL_ADDRESS, 22, LOGIN, PASSWORD)
@@ -251,11 +255,14 @@ def main():
             client.chdir("/sharedfolders/")
             go_to_directory_sftp(client, BACKUP_DIRECTORY)
     except PermissionError as error:
-        LOGGER.warning("Impossible d'écrire dans le seveur. Vérifiez le chemin spécifié pour la sauvegarde et les droits de l'utilisateur renseigné.")
+        LOGGER.warning(
+            "Impossible d'écrire dans le seveur. Vérifiez le chemin spécifié pour la sauvegarde et les droits de l'utilisateur renseigné.")
     except paramiko.ssh_exception.AuthenticationException as error:
-        LOGGER.warning("Erreur lors de l'authentification au serveur. Vérifiez identifiants et mot de passe.")
+        LOGGER.warning(
+            "Erreur lors de l'authentification au serveur. Vérifiez identifiants et mot de passe.")
     except TimeoutError as error:
-        LOGGER.warning("Impossible de joindre le serveur, Vérifiez l'adresse du serveur.")
+        LOGGER.warning(
+            "Impossible de joindre le serveur, Vérifiez l'adresse du serveur.")
     except ConnectionRefusedError as error:
         LOGGER.warning("Le serveur a refuser la connection.")
     except error_perm as error:
@@ -274,7 +281,8 @@ def main():
                 try:
                     copy_ftp(client, directory)
                 except FileNotFoundError as error:
-                    LOGGER.warning("Un dossier à enregistrer n'existe pas. Vérifiez le chemin fourni")
+                    LOGGER.warning(
+                        "Un dossier à enregistrer n'existe pas. Vérifiez le chemin fourni")
                 else:
                     client.cwd('..')
                     global size_save
@@ -290,7 +298,8 @@ def main():
                 try:
                     copy_sftp(client, directory)
                 except FileNotFoundError as error:
-                    LOGGER.warning("Un dossier à enregistrer n'existe pas. Vérifiez le chemin fourni")
+                    LOGGER.warning(
+                        "Un dossier à enregistrer n'existe pas. Vérifiez le chemin fourni")
                 else:
                     client.chdir('..')
                     size_save += int(os.popen("du -sk " +
@@ -300,38 +309,47 @@ def main():
 
 
 DIRECTORY_LIST = get_paths(DIRECTORIES_TO_SAVE)
-main()
-with open("dir-saver.log","r") as log:
-    text = "".join(log.readlines())
-    if text.find("WARNING") != -1 or text.find("ERROR") != -1:
-        error = True
+config_ok = verif_config.main()
+if config_ok == "ok":
+    main()
+    with open("dir-saver.log", "r") as log:
+        text = "".join(log.readlines())
+        if text.find("WARNING") != -1 or text.find("ERROR") != -1:
+            error = True
+        else:
+            error = False
+    if not error:
+        LOGGER.info("Copie réussie !")
+        LOGGER.info("Nombre de fichiers sauvegardés : %s", nb_file_save)
+        LOGGER.info("Volume sauvegardé : %s Ko", size_save)
+        if directory_removed != None:
+            LOGGER.info(
+                "La précédente sauvegarde contenue dans le dossier '%s' a été supprimé",
+                directory_removed)
+        LOGGER.info("Nom du dossier de sauvegarde : %s", name_directory)
+        if MAIL_ON:
+            try:
+                mail.success()
+            except socket.gaierror as error:
+                LOGGER.warning("Impossible de se connecter au serveur SMTP")
+            except TimeoutError as error:
+                LOGGER.warning(
+                    "Pas de reponse du serveur SMTP, vérifiez l' adresse et le port.")
+            except smtplib.SMTPAuthenticationError as error:
+                LOGGER.warning(
+                    "Erreur lors de l'authentification au serveur SMTP, vérifiez mot de passe et adresse mail")
     else:
-        error = False
-if not error:
-    LOGGER.info("Copie réussie !")
-    LOGGER.info("Nombre de fichiers sauvegardés : %s", nb_file_save)
-    LOGGER.info("Volume sauvegardé : %s Ko", size_save)
-    if directory_removed != None:
-        LOGGER.info(
-            "La précédente sauvegarde contenue dans le dossier '%s' a été supprimé",
-             directory_removed)
-    LOGGER.info("Nom du dossier de sauvegarde : %s", name_directory)
-    if MAIL_ON:
-        try:
-            mail.success()
-        except socket.gaierror as error:
-            LOGGER.warning("Impossible de se connecter au serveur SMTP")
-        except TimeoutError as error:
-            LOGGER.warning("Pas de reponse du serveur SMTP, vérifiez l' adresse et le port.")
-        except smtplib.SMTPAuthenticationError as error:
-            LOGGER.warning("Erreur lors de l'authentification au serveur SMTP, vérifiez mot de passe et adresse mail")
+        if MAIL_ON:
+            try:
+                mail.failure()
+            except socket.gaierror as error:
+                LOGGER.warning("Impossible de se connecter au serveur SMTP")
+            except TimeoutError as error:
+                LOGGER.warning(
+                    "Pas de reponse du serveur SMTP, vérifiez l' adresse et le port.")
+            except smtplib.SMTPAuthenticationError as error:
+                LOGGER.warning(
+                    "Erreur lors de l'authentification au serveur SMTP, vérifiez mot de passe et adresse mail")
 else:
-    if MAIL_ON:
-        try:
-            mail.failure()
-        except socket.gaierror as error:
-            LOGGER.warning("Impossible de se connecter au serveur SMTP")
-        except TimeoutError as error:
-            LOGGER.warning("Pas de reponse du serveur SMTP, vérifiez l' adresse et le port.")
-        except smtplib.SMTPAuthenticationError as error:
-            LOGGER.warning("Erreur lors de l'authentification au serveur SMTP, vérifiez mot de passe et adresse mail")
+    LOGGER.warning(config_ok)
+    print(config_ok)

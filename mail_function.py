@@ -47,7 +47,6 @@ def send_mail(subject, body):
             f"attachment; filename= {filename}",
         )
 
-
         message.attach(part)
     text = message.as_string()
 
@@ -58,14 +57,14 @@ def send_mail(subject, body):
 
 
 def success():
+    ''' Fonction qui envoie un mail disant que la copie des dossiers s'est bien passé'''
     config = config_init()
     log_on = config.getboolean('mail', 'log_attached')
-    ''' Fonction qui envoie un mail disant que la copie des dossiers s'est bien passé'''
     if log_on:
         text = "Les dossiers ont bien été enregistrés, vous trouverez les log en pièce jointe.\nDétails :\n"
     else:
         text = "Les dossiers ont bien été enregistrés.\nDétails :\n"
-    with open("dir-saver.log","r") as log:
+    with open("dir-saver.log", "r") as log:
         line = log.readline()
         while line.find("Copie réussie !") == -1:
             line = log.readline()
@@ -76,7 +75,7 @@ def success():
 def failure():
     ''' Fonction qui envoie un mail disant qu'il y a eu un problème lors de la copie'''
     text = "Erreur lors de la copie :\n"
-    with open("dir-saver.log","r") as log:
+    with open("dir-saver.log", "r") as log:
         line = log.readline()
         while line.find("WARNING") != -1:
             line = log.readline()
