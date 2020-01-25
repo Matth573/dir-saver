@@ -25,7 +25,7 @@ def send_mail(subject, body):
     smtp_url = config.get('mail', 'smtp_host')
     smtp_port = config.get('mail', 'smtp_port')
     password = config.get('mail', 'smtp_password')
-    log_on = config.get('directories', 'log_attached')
+    log_on = config.get('mail', 'log_attached')
 
     message = MIMEMultipart()
     message["From"] = from_address
@@ -55,8 +55,6 @@ def send_mail(subject, body):
         server.login(from_address, password)
         server.sendmail(from_address, to_address, text)
 
-#sendMail("Test Mail", "Ceci est mon premier mail envoyé avec python", "arthur.quef@gmail.com")
-
 
 def success():
     ''' Fonction qui envoie un mail disant que la copie des dossiers s'est bien passé'''
@@ -70,4 +68,4 @@ def failure():
               "Il y a eu un problème lors de la copie. Cf les fichier de log en pièce jointe.")
 
 
-success()
+#success()

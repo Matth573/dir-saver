@@ -9,6 +9,7 @@ import shutil
 import os
 import logging
 import configparser
+import mail_function
 import paramiko
 
 
@@ -43,6 +44,7 @@ size_save = 0
 directories_saved = 0
 name_directory = None
 directory_removed = None
+error = False
 
 
 def get_paths(directories_path):
@@ -160,6 +162,7 @@ def go_to_directory_sftp(sftp, path):
             sftp.mkdir(directory)
         sftp.chdir(directory)
 
+
 def get_last_number_sftp(client):
     ''' Fonction qui résupère le dernier nombre utilisé pour faire une sauvegarde avec sftp'''
     if len(client.listdir()) != 0:
@@ -167,12 +170,14 @@ def get_last_number_sftp(client):
     else:
         return 0
 
+
 def get_last_number_ftp(client):
     ''' Fonction qui résupère le dernier nombre utilisé pour faire une sauvegarde avec ftp'''
     if len(client.nlst()) != 0:
         return max([int(i) for i in client.nlst()])
     else:
         return 0
+
 
 def version_handler(client):
     ''' Fonction qui vérifie s'il faut gérer le nombre de sauvegarde à garder
@@ -188,16 +193,18 @@ def version_handler(client):
     if WITH_FTP or WITH_FTPS:
         if VERSION_CONTROL:
             if len(client.nlst()) >= int(VERSION_NUMBER):
-                    LOGGER.info(
-                        "Nombre maximale de dossier sauvegardé atteint. Suppression de la plus vieille sauvegarde")
-                    if VERSION_FORMAT == "date":
-                        LOGGER.info("Suppression du dossier %s", client.nlst()[0])
-                        directory_removed = client.nlst()[0]
-                        remove_ftp_dir(client, BACKUP_DIRECTORY + "/" + client.nlst()[0])
-                    elif VERSION_FORMAT == "number":
-                        directory_removed = min([int(i) for i in client.nlst()])
-                        LOGGER.info("Suppression du dossier %s", directory_removed)
-                        remove_ftp_dir(client, BACKUP_DIRECTORY + "/" + str(directory_removed))
+                LOGGER.info(
+                    "Nombre maximale de dossier sauvegardé atteint. Suppression de la plus vieille sauvegarde")
+                if VERSION_FORMAT == "date":
+                    LOGGER.info("Suppression du dossier %s", client.nlst()[0])
+                    directory_removed = client.nlst()[0]
+                    remove_ftp_dir(client, BACKUP_DIRECTORY +
+                                   "/" + client.nlst()[0])
+                elif VERSION_FORMAT == "number":
+                    directory_removed = min([int(i) for i in client.nlst()])
+                    LOGGER.info("Suppression du dossier %s", directory_removed)
+                    remove_ftp_dir(client, BACKUP_DIRECTORY +
+                                   "/" + str(directory_removed))
         LOGGER.info("Création du dossier de sauvegarde : %s", name_directory)
         client.mkd(name_directory)
         client.cwd(name_directory)
@@ -207,7 +214,8 @@ def version_handler(client):
                 LOGGER.info(
                     "Nombre maximale de dossier sauvegardé atteint. Suppression de la plus vieille sauvegarde")
                 if VERSION_FORMAT == "date":
-                    LOGGER.info("Suppression du dossier %s", client.listdir()[0])
+                    LOGGER.info("Suppression du dossier %s",
+                                client.listdir()[0])
                     directory_removed = client.listdir()[0]
                     remove_directory_sftp(client, client.listdir()[0])
                 elif VERSION_FORMAT == "number":
@@ -255,6 +263,9 @@ def main():
                 client.cwd(name_directory)
                 copy_ftp(client, directory)
                 client.cwd('..')
+                global size_save
+                size_save += int(os.popen("du -sk " +
+                                           directory.replace(' ','\ ') + " | awk '{print $1}'").read())
         elif WITH_SFTP:
             for directory in DIRECTORY_LIST:
                 LOGGER.info("Copie du dossier : %s", directory)
@@ -263,8 +274,14 @@ def main():
                 client.chdir(name_directory)
                 copy_sftp(client, directory)
                 client.chdir('..')
+                size_save += int(
+                    os.system("du -s %s | awk '{print $1}'", directory))
         client.close()
 
 
 DIRECTORY_LIST = get_paths(DIRECTORIES_TO_SAVE)
 main()
+if not error:
+    LOGGER.info("Copie réussie !")
+    LOGGER.info("Nombre de fichiers sauvegardés : %s", nb_file_save)
+    LOGGER.info("Volume sauvegardé : %s Ko", size_save)
