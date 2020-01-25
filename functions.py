@@ -202,13 +202,18 @@ def version_handler(client):
         client.mkd(name_directory)
         client.cwd(name_directory)
     elif WITH_SFTP:
-        if int(VERSION_NUMBER) > 0:
+        if VERSION_CONTROL:
             if len(client.listdir()) >= int(VERSION_NUMBER):
                 LOGGER.info(
                     "Nombre maximale de dossier sauvegardé atteint. Suppression de la plus vieille sauvegarde")
-                LOGGER.info("Suppression du dossier %s", client.listdir()[0])
-                directory_removed = client.listdir()[0]
-                remove_directory_sftp(client, client.listdir()[0])
+                if VERSION_FORMAT == "date":
+                    LOGGER.info("Suppression du dossier %s", client.listdir()[0])
+                    directory_removed = client.listdir()[0]
+                    remove_directory_sftp(client, client.listdir()[0])
+                elif VERSION_FORMAT == "number":
+                    directory_removed = min([int(i) for i in client.listdir()])
+                    LOGGER.info("Suppression du dossier %s", directory_removed)
+                    remove_directory_sftp(client, str(directory_removed))
         LOGGER.info("Création du dossier de sauvegarde : %s", name_directory)
         client.mkdir(name_directory)
         client.chdir(name_directory)
