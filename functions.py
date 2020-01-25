@@ -7,6 +7,8 @@ from datetime import datetime
 from stat import S_ISDIR
 import shutil
 import os
+import smtplib
+import socket
 import logging
 import configparser
 import mail_function as mail
@@ -248,6 +250,12 @@ def main():
             client = ssh.open_sftp()
             client.chdir("/sharedfolders/")
             go_to_directory_sftp(client, BACKUP_DIRECTORY)
+    except PermissionError as error:
+        LOGGER.warning("Impossible d'écrire dans le seveur. Vérifiez le chemin spécifié pour la sauvegarde et les droits de l'utilisateur renseigné.")
+    except paramiko.ssh_exception.AuthenticationException as error:
+        LOGGER.warning("Erreur lors de l'authentification au serveur. Vérifiez identifiants et mot de passe.")
+    except TimeoutError as error:
+        LOGGER.warning("Impossible de joindre le serveur, Vérifiez l'adresse du serveur.")
     except ConnectionRefusedError as error:
         LOGGER.warning("Le serveur a refuser la connection.")
     except error_perm as error:
@@ -263,23 +271,31 @@ def main():
                 name_directory = directory.split('/')[-1]
                 client.mkd(name_directory)
                 client.cwd(name_directory)
-                copy_ftp(client, directory)
-                client.cwd('..')
-                global size_save
-                size_save += int(os.popen("du -sk " +
-                                          directory.replace(' ', '\ ') +
-                                          " | awk '{print $1}'").read())
+                try:
+                    copy_ftp(client, directory)
+                except FileNotFoundError as error:
+                    LOGGER.warning("Un dossier à enregistrer n'existe pas. Vérifiez le chemin fourni")
+                else:
+                    client.cwd('..')
+                    global size_save
+                    size_save += int(os.popen("du -sk " +
+                                              directory.replace(' ', '\ ') +
+                                              " | awk '{print $1}'").read())
         elif WITH_SFTP:
             for directory in DIRECTORY_LIST:
                 LOGGER.info("Copie du dossier : %s", directory)
                 name_directory = directory.split('/')[-1]
                 client.mkdir(name_directory)
                 client.chdir(name_directory)
-                copy_sftp(client, directory)
-                client.chdir('..')
-                size_save += int(os.popen("du -sk " +
-                                          directory.replace(' ', '\ ') +
-                                          " | awk '{print $1}'").read())
+                try:
+                    copy_sftp(client, directory)
+                except FileNotFoundError as error:
+                    LOGGER.warning("Un dossier à enregistrer n'existe pas. Vérifiez le chemin fourni")
+                else:
+                    client.chdir('..')
+                    size_save += int(os.popen("du -sk " +
+                                              directory.replace(' ', '\ ') +
+                                              " | awk '{print $1}'").read())
         client.close()
 
 
@@ -301,7 +317,21 @@ if not error:
              directory_removed)
     LOGGER.info("Nom du dossier de sauvegarde : %s", name_directory)
     if MAIL_ON:
-        mail.success()
+        try:
+            mail.success()
+        except socket.gaierror as error:
+            LOGGER.warning("Impossible de se connecter au serveur SMTP")
+        except TimeoutError as error:
+            LOGGER.warning("Pas de reponse du serveur SMTP, vérifiez l' adresse et le port.")
+        except smtplib.SMTPAuthenticationError as error:
+            LOGGER.warning("Erreur lors de l'authentification au serveur SMTP, vérifiez mot de passe et adresse mail")
 else:
     if MAIL_ON:
-        mail.failure()
+        try:
+            mail.failure()
+        except socket.gaierror as error:
+            LOGGER.warning("Impossible de se connecter au serveur SMTP")
+        except TimeoutError as error:
+            LOGGER.warning("Pas de reponse du serveur SMTP, vérifiez l' adresse et le port.")
+        except smtplib.SMTPAuthenticationError as error:
+            LOGGER.warning("Erreur lors de l'authentification au serveur SMTP, vérifiez mot de passe et adresse mail")

@@ -19,3 +19,6 @@ def main():
             counter = counter + 1
     if counter != 1:
         return "Une seule méthode de sauvegarde doit être utilisé."
+    FORMAT = CONFIG.get('version_handler', 'format')
+    if format != "date" or format != "number":
+        return "Le format du nom de dossier est soit 'number', soit 'date'"
