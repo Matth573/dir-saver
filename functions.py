@@ -9,7 +9,7 @@ import shutil
 import os
 import logging
 import configparser
-import mail_function
+import mail_function as mail
 import paramiko
 
 
@@ -27,24 +27,23 @@ LOGGER.info(
 CONFIG = configparser.ConfigParser()
 CONFIG.read('config.ini')
 DIRECTORIES_TO_SAVE = CONFIG.get('directories', 'directories_to_save')
-WITH_FTP = CONFIG.get('save_method', 'with_ftp')
-WITH_FTPS = CONFIG.get('save_method', 'with_ftps')
-WITH_SFTP = CONFIG.get('save_method', 'WITH_SFTP')
-WITH_LOCAL_SAVE = CONFIG.get('save_method', 'with_local_save')
+WITH_FTP = CONFIG.getboolean('save_method', 'with_ftp')
+WITH_FTPS = CONFIG.getboolean('save_method', 'with_ftps')
+WITH_SFTP = CONFIG.getboolean('save_method', 'WITH_SFTP')
+WITH_LOCAL_SAVE = CONFIG.getboolean('save_method', 'with_local_save')
 IP_URL_ADDRESS = CONFIG.get('connection_parameters', 'ip_url_address')
 LOGIN = CONFIG.get('connection_parameters', 'login')
 PASSWORD = CONFIG.get('connection_parameters', 'password')
 BACKUP_DIRECTORY = CONFIG.get('directories', 'backup_directory')
-VERSION_CONTROL = CONFIG.get('version_handler', 'version_control')
+VERSION_CONTROL = CONFIG.getboolean('version_handler', 'version_control')
 VERSION_NUMBER = CONFIG.get('version_handler', 'version_number')
 VERSION_FORMAT = CONFIG.get('version_handler', 'format')
-MAIL_ON = CONFIG.get('mail', 'get_mail')
+MAIL_ON = CONFIG.getboolean('mail', 'get_mail')
 nb_file_save = 0
 size_save = 0
 directories_saved = 0
 name_directory = None
 directory_removed = None
-error = False
 
 
 def get_paths(directories_path):
@@ -81,6 +80,7 @@ def copy_sftp(sftp, path):
     ''' Fonction qui copie le dossier indiqué par le chemin en paramètre en utilisant
         le protocole sftp
     '''
+    global nb_file_save
     for name in os.listdir(path):
         localpath = os.path.join(path, name)
         if os.path.isfile(localpath):
@@ -183,6 +183,8 @@ def version_handler(client):
     ''' Fonction qui vérifie s'il faut gérer le nombre de sauvegarde à garder
         sur le serveur et qui supprime des sauvegardes si besoin
     '''
+    global directory_removed
+    global name_directory
     if VERSION_FORMAT == "date":
         name_directory = str(datetime.now())
     elif VERSION_FORMAT == "number":
@@ -192,7 +194,7 @@ def version_handler(client):
             name_directory = str(get_last_number_sftp(client) + 1)
     if WITH_FTP or WITH_FTPS:
         if VERSION_CONTROL:
-            if len(client.nlst()) >= int(VERSION_NUMBER):
+            while len(client.nlst()) >= int(VERSION_NUMBER):
                 LOGGER.info(
                     "Nombre maximale de dossier sauvegardé atteint. Suppression de la plus vieille sauvegarde")
                 if VERSION_FORMAT == "date":
@@ -210,7 +212,7 @@ def version_handler(client):
         client.cwd(name_directory)
     elif WITH_SFTP:
         if VERSION_CONTROL:
-            if len(client.listdir()) >= int(VERSION_NUMBER):
+            while len(client.listdir()) >= int(VERSION_NUMBER):
                 LOGGER.info(
                     "Nombre maximale de dossier sauvegardé atteint. Suppression de la plus vieille sauvegarde")
                 if VERSION_FORMAT == "date":
@@ -231,7 +233,7 @@ def main():
     ''' Fonction main qui appelle les bonnes fonctions selon les paramètres renseigné
         dans le fichier de configuration.
     '''
-    error = False
+    global directory_removed
     try:
         if WITH_FTPS:
             client = FTP_TLS(IP_URL_ADDRESS, LOGIN, PASSWORD, BACKUP_DIRECTORY)
@@ -246,13 +248,13 @@ def main():
             client = ssh.open_sftp()
             client.chdir("/sharedfolders/")
             go_to_directory_sftp(client, BACKUP_DIRECTORY)
+    except ConnectionRefusedError as error:
+        LOGGER.warning("Le serveur a refuser la connection.")
     except error_perm as error:
         if str(error)[:3] == "550":
             LOGGER.warning("Le serveur requiert une connexion sur TLS")
-            error = True
         else:
             LOGGER.error(error)
-            error = True
     else:
         version_handler(client)
         if WITH_FTP or WITH_FTPS:
@@ -265,7 +267,8 @@ def main():
                 client.cwd('..')
                 global size_save
                 size_save += int(os.popen("du -sk " +
-                                           directory.replace(' ','\ ') + " | awk '{print $1}'").read())
+                                          directory.replace(' ', '\ ') +
+                                          " | awk '{print $1}'").read())
         elif WITH_SFTP:
             for directory in DIRECTORY_LIST:
                 LOGGER.info("Copie du dossier : %s", directory)
@@ -274,14 +277,31 @@ def main():
                 client.chdir(name_directory)
                 copy_sftp(client, directory)
                 client.chdir('..')
-                size_save += int(
-                    os.system("du -s %s | awk '{print $1}'", directory))
+                size_save += int(os.popen("du -sk " +
+                                          directory.replace(' ', '\ ') +
+                                          " | awk '{print $1}'").read())
         client.close()
 
 
 DIRECTORY_LIST = get_paths(DIRECTORIES_TO_SAVE)
 main()
+with open("dir-saver.log","r") as log:
+    text = "".join(log.readlines())
+    if text.find("WARNING") != -1 or text.find("ERROR") != -1:
+        error = True
+    else:
+        error = False
 if not error:
     LOGGER.info("Copie réussie !")
     LOGGER.info("Nombre de fichiers sauvegardés : %s", nb_file_save)
     LOGGER.info("Volume sauvegardé : %s Ko", size_save)
+    if directory_removed != None:
+        LOGGER.info(
+            "La précédente sauvegarde contenue dans le dossier '%s' a été supprimé",
+             directory_removed)
+    LOGGER.info("Nom du dossier de sauvegarde : %s", name_directory)
+    if MAIL_ON:
+        mail.success()
+else:
+    if MAIL_ON:
+        mail.failure()
