@@ -75,4 +75,21 @@ Le module "verif_config.py" vérifie qu'une seule méthode de transfert est spé
 
 ## remove_ftp_dir
 
-- 
+- path : le chemin du répertoire à supprimer
+- name : le nom de l'élément à supprimer
+- properties : les propriétés de l'élément à supprimer
+
+## remove_directory_sftp
+
+- path : le chemin du répertoire à supprimer
+- files : la liste des éléments à supprimer
+- file : le nom de l'élément à supprimer
+
+## go_to_directory_sftp/ftp/local
+
+- listdir : la liste des dossier à parcourir pour atteindre l'endroit voulu
+- directory : les éléments du répertoire courant
+
+## main
+
+- name_directory_backup : le nom du dossier  copié dans la destination
