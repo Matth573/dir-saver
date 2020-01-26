@@ -165,20 +165,21 @@ def go_to_directory_sftp(sftp, path):
             sftp.mkdir(directory)
         sftp.chdir(directory)
 
+
 def go_to_directory_local(path):
     LOGGER.info("Déplacement jusqu'au dossier : %s", path)
-    os.system('cd /')
+    os.system('cd ' + path)
     print(os.popen('pwd').read())
-    listdir = path.split('/')
-    if listdir[0] == '':
-        listdir.remove('')
-    for directory in listdir:
-        print(os.popen('ls -a').read().split('\n'))
-        if not directory in os.popen('ls -a').read().split('\n'):
-            LOGGER.info(
-                "Le dossier %s n'existe pas, création du dossier", directory)
-            os.system('mkdir ' + directory)
-        os.system('cd ' + directory)
+    #listdir = path.split('/')
+    # if listdir[0] == '':
+    #    listdir.remove('')
+    # for directory in listdir:
+    #    print(os.popen('ls -a').read().split('\n'))
+    #    if not directory in os.popen('ls -a').read().split('\n'):
+    #        LOGGER.info(
+    #            "Le dossier %s n'existe pas, création du dossier", directory)
+    #        os.system('mkdir ' + directory)
+    #    os.system('cd ' + directory)
 
 
 def get_last_number_sftp(client):
@@ -196,12 +197,14 @@ def get_last_number_ftp(client):
     else:
         return 0
 
-def get_last_number_local():
-    list = os.popen('ls').read().split('\n')
+
+def get_last_number_local(path):
+    list = os.popen('ls ' + BACKUP_DIRECTORY.replace(' ','\ ')).read().split('\n')
     if len(list) > 0:
-        return min([int(i) for i in list])
+        return max([int(i) for i in list])
     else:
         return 0
+
 
 def version_handler(client):
     ''' Fonction qui vérifie s'il faut gérer le nombre de sauvegarde à garder
@@ -217,7 +220,7 @@ def version_handler(client):
         elif WITH_SFTP:
             name_directory = str(get_last_number_sftp(client) + 1)
         elif WITH_LOCAL_SAVE:
-            name_directory = str( + 1)
+            name_directory = str(get_last_number_local() + 1)
     if WITH_FTP or WITH_FTPS:
         if VERSION_CONTROL:
             while len(client.nlst()) >= int(VERSION_NUMBER):
@@ -255,21 +258,22 @@ def version_handler(client):
         client.chdir(name_directory)
     elif WITH_LOCAL_SAVE:
         if VERSION_CONTROL:
-            while len(os.popen('ls').read()) >= int(VERSION_NUMBER):
+            while len(os.popen('ls ' + BACKUP_DIRECTORY.replace(' ','\ ')).read()) >= int(VERSION_NUMBER):
                 LOGGER.info(
                     "Nombre maximale de dossier sauvegardé atteint. Suppression de la plus vieille sauvegarde")
                 if VERSION_FORMAT == "date":
+                    directory_removed = os.popen(
+                        'ls ' + BACKUP_DIRECTORY.replace(' ','\ ')).read().split('\n')[0]
                     LOGGER.info("Suppression du dossier %s",
-                                os.popen('ls').read().split('\n')[0])
-                    directory_removed = os.popen('ls').read().split('\n')[0]
+                                directory_removed)
                     os.system('rm -r ' + directory_removed)
                 elif VERSION_FORMAT == "number":
                     directory_removed = get_last_number_local()
                     LOGGER.info("Suppression du dossier %s", directory_removed)
                     os.system('rm -r ' + directory_removed)
         LOGGER.info("Création du dossier de sauvegarde : %s", name_directory)
-        client.mkdir(name_directory)
-        client.chdir(name_directory)
+        os.system("mkdir " + BACKUP_DIRECTORY.replace(' ','\ ') + '/' + name_directory.replace(' ','\ '))
+
 
 def main():
     ''' Fonction main qui appelle les bonnes fonctions selon les paramètres renseigné
@@ -294,7 +298,6 @@ def main():
             client.chdir("/sharedfolders/")
             go_to_directory_sftp(client, BACKUP_DIRECTORY)
         elif WITH_LOCAL_SAVE:
-            go_to_directory_local(BACKUP_DIRECTORY)
             client = None
     except PermissionError as error:
         LOGGER.warning(
@@ -309,54 +312,58 @@ def main():
         LOGGER.warning("Le serveur a refuser la connection.")
     except error_perm as error:
         if str(error)[:3] == "550":
-            LOGGER.warning("Le serveur requiert une connexion sur TLS")
+            LOGGER.warning(
+                "Permission refusé, vérifier que vous avez les bons droits sur le serveur")
         else:
             LOGGER.error(error)
     else:
-        version_handler(client)
-        if WITH_FTP or WITH_FTPS:
-            for directory in DIRECTORY_LIST:
-                LOGGER.info("Copie du dossier : %s", directory)
-                name_directory = directory.split('/')[-1]
-                client.mkd(name_directory)
-                client.cwd(name_directory)
-                try:
-                    copy_ftp(client, directory)
-                except FileNotFoundError as error:
-                    LOGGER.warning(
-                        "Un dossier à enregistrer n'existe pas. Vérifiez le chemin fourni")
-                else:
-                    client.cwd('..')
-                    global size_save
-                    size_save += int(os.popen("du -sk " +
-                                              directory.replace(' ', '\ ') +
-                                              " | awk '{print $1}'").read())
-        elif WITH_SFTP:
-            for directory in DIRECTORY_LIST:
-                LOGGER.info("Copie du dossier : %s", directory)
-                name_directory = directory.split('/')[-1]
-                client.mkdir(name_directory)
-                client.chdir(name_directory)
-                try:
-                    copy_sftp(client, directory)
-                except FileNotFoundError as error:
-                    LOGGER.warning(
-                        "Un dossier à enregistrer n'existe pas. Vérifiez le chemin fourni")
-                else:
-                    client.chdir('..')
-                    size_save += int(os.popen("du -sk " +
-                                              directory.replace(' ', '\ ') +
-                                              " | awk '{print $1}'").read())
-        elif WITH_LOCAL_SAVE:
-            for directory in DIRECTORY_LIST:
-                LOGGER.info("Copie du dossier : %s", directory)
-                name_directory = directory.split('/')[-1]
-                os.system("mkdir " + name_directory + "| chdir " + name_directory)
-                localpath=os.popen("pwd").read()
-                local_copy(directory,localpath)
-                os.system("cd ..")
-        if not WITH_LOCAL_SAVE:
-            client.close()
+        try:
+            version_handler(client)
+        except ValueError as error:
+            LOGGER.warning(
+                "La nomenclature des dossiers à changé, vous devez retourner à l'ancienne version ou supprimer les sauvegardes existantes.")
+        else:
+            if WITH_FTP or WITH_FTPS:
+                for directory in DIRECTORY_LIST:
+                    LOGGER.info("Copie du dossier : %s", directory)
+                    name_directory_backup = directory.split('/')[-1]
+                    client.mkd(name_directory_backup)
+                    client.cwd(name_directory_backup)
+                    try:
+                        copy_ftp(client, directory)
+                    except FileNotFoundError as error:
+                        LOGGER.warning(
+                            "Un dossier à enregistrer n'existe pas. Vérifiez le chemin fourni")
+                    else:
+                        client.cwd('..')
+                        global size_save
+                        size_save += int(os.popen("du -sk " +
+                                                  directory.replace(' ', '\ ') +
+                                                  " | awk '{print $1}'").read())
+            elif WITH_SFTP:
+                for directory in DIRECTORY_LIST:
+                    LOGGER.info("Copie du dossier : %s", directory)
+                    name_directory_backup = directory.split('/')[-1]
+                    client.mkdir(name_directory_backup)
+                    client.chdir(name_directory_backup)
+                    try:
+                        copy_sftp(client, directory)
+                    except FileNotFoundError as error:
+                        LOGGER.warning(
+                            "Un dossier à enregistrer n'existe pas. Vérifiez le chemin fourni")
+                    else:
+                        client.chdir('..')
+                        size_save += int(os.popen("du -sk " +
+                                                  directory.replace(' ', '\ ') +
+                                                  " | awk '{print $1}'").read())
+            elif WITH_LOCAL_SAVE:
+                for directory in DIRECTORY_LIST:
+                    LOGGER.info("Copie du dossier : %s", directory)
+                    name_directory_backup = directory.split('/')[-1]
+                    name_directory_backup = BACKUP_DIRECTORY + '/' + name_directory_backup
+                    local_copy(directory,name_directory_backup)
+            if not WITH_LOCAL_SAVE:
+                client.close()
 
 
 DIRECTORY_LIST = get_paths(DIRECTORIES_TO_SAVE)
