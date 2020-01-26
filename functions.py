@@ -194,7 +194,7 @@ def get_last_number_local():
 #Fonction qui gère la nomenclature des dossiers en fonctions des options précisé par l'utilisateur.
 def version_handler(client):
     ''' Fonction qui vérifie s'il faut gérer le nombre de sauvegarde à garder
-        sur le serveur et qui supprime des sauvegardes si besoin
+        sur le serveur et qui supprime des sauvegardes existantes si besoin
     '''
     global directory_removed
     global name_directory
