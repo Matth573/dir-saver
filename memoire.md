@@ -28,9 +28,51 @@ Pour la connexion via SFTP, OpenMediaVault place les dossier partagé dans le r�
 
 #### Création du dossier et copie
 
-Une fois dans le bon dossier, l'application appel la fonction "version_handler" qui s'occupe de vérifier comment nommer le dossier de sauvegarde et s'il faut gérer le nombre de dossier. Une fois le nouveau dossier crée, l'application appel la bonne fonction de copie.
+Une fois dans le bon dossier, l'application appel la fonction "version_handler" qui s'occupe de vérifier comment nommer le dossier de sauvegarde et s'il faut gérer le nombre de dossier. Une fois le nouveau dossier crée, l'application crée un répertoire pour chaque dossier spécifié par l'utilisateur et appelle la bonne fonction de copie. 
+
+
+
+Une fois sortie du main, l'application reconnait si la copie est bien effectué en lisant le fichier de log généré. Si un warning est présent, c'est que tout ne s'est pas bien passé.
+
+Si l'utilisateur a demandé de recevoir un mail, l'application appelle ensuite la fonction *success* ou *failure* du fichier "mail_function.py".
+
+## mail_function.py
+
+Le module mail_function se compose d'une fonction principale *send_mail* qui prend en paramètre un objet et un corps et qui envoie le mail correspondant en utilisant la configuration spécifié par l'utilisateur.
+
+Les deux fonctions *success* et *failure* adapte l'objet et le corps à donner à la fonction *send_mail* pour correspondre à la réussite ou à l'échec de la copie.
+
+Pour donner plus d'indication dans le mail, la fonction success va copier les dernière ligne du fichier log pour les incorporer au corps du mail.
+
+## verif_config.py
+
+Le module "verif_config.py" vérifie qu'une seule méthode de transfert est spécifié dans le fichier de configuration et que le nom à donner aux sauvegardes est bien "number" ou "date".
 
 ## Liste des variables : 
 
 ### Variables globales:
 
+- CONFIG : La variable qui contient l'objet ConfigParser
+- DIRECTORIES_TO_SAVE : les répertoires à sauvegarder tels qu'indiqué par l'utilisateur 
+- WITH_FTP, WITH_FTPS, WITH_SFTP, WITH_LOCAL_SAVE : booléens correspondant au choix de méthode de sauvegarde de l'utilisateur.
+- IP_URL_ADDRESS : adresse ip ou url du serveur tel qu'indiqué par l'utilisateur
+- LOGIN, PASSWORD : Identifiants et mot de passe pour se connecter au serveur, tels qu'indiqués par l'utilisateur
+- BACKUP_DIRECTORY : Le chemin où doivent être enregistré les sauvegardes dans la destination.
+- VERSION_CONTROL : booléen correpondant que choix de l'utilisateur de restreindre le nombre de sauvegarde dans la destination
+- VERSION_NUMBER : le nombre de sauvegarde à garder
+- VERSION_FORMAT : le format à donner aux noms des dossiers de sauvegarde
+- MAIL_ON : booléen correpondant que choix de l'utilisateur d'envoyer un mail après l'exécution de l'application ou non
+- nb_file_save : le nombre de fichier sauvegardé dans la destination
+- name_directory : le nom donné au dossier qui contient la sauvegarde 
+- directory_removed : le nom du dossier de la sauvegarde qui a été supprimée si le maximum de sauvegarde étai atteint
+
+## copy_ftp, copy_sftp
+
+- ftp, sftp : la variable contenant l'objet FTP, FTP_TLS ou SFTP utilisé pour interagir avec le serveur 
+- path : le chemin du répertoire à copier
+- name : le nom des éléments du répertoires en cours de copie
+- localpath : le chemin de l'élément en cours de copie
+
+## remove_ftp_dir
+
+- 

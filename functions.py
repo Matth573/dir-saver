@@ -44,7 +44,6 @@ VERSION_FORMAT = CONFIG.get('version_handler', 'format')
 MAIL_ON = CONFIG.getboolean('mail', 'get_mail')
 nb_file_save = 0
 size_save = 0
-directories_saved = 0
 name_directory = None
 directory_removed = None
 
@@ -64,6 +63,7 @@ def copy_ftp(ftp, path):
     ''' Fonction qui copie le dossier indiqué par le chemin en paramètre en utilisant
         le protocole ftp
     '''
+    global nb_file_save
     for name in os.listdir(path):
         localpath = os.path.join(path, name)
         if os.path.isfile(localpath):
@@ -186,10 +186,19 @@ def get_last_number_local():
     ''' Fonction qui récupère le dernier nombre utilisé pour faire une sauvegarde en locale'''
     list = os.popen('ls ' + BACKUP_DIRECTORY.replace(' ', '\ ')
                     ).read().split('\n')
-    if len(list) > 0:
+    list.remove('')
+    if len(list)>0:
         return max([int(i) for i in list])
     else:
         return 0
+
+def get_first_number_local():
+    ''' Fonction qui récupère le plus petit nombre utilisé pour faire une sauvegarde en locale'''
+    list = os.popen('ls ' + BACKUP_DIRECTORY.replace(' ', '\ ')
+                    ).read().split('\n')
+    list.remove('')
+    if len(list)>0:
+        return min([int(i) for i in list])
 
 #Fonction qui gère la nomenclature des dossiers en fonctions des options précisé par l'utilisateur.
 def version_handler(client):
@@ -244,7 +253,8 @@ def version_handler(client):
         client.chdir(name_directory)
     elif WITH_LOCAL_SAVE:
         if VERSION_CONTROL:
-            while len(os.popen('ls ' + BACKUP_DIRECTORY.replace(' ', '\ ')).read()) >= int(VERSION_NUMBER):
+            #import pdb; pdb.set_trace()
+            while len(os.popen('ls ' + BACKUP_DIRECTORY.replace(' ', '\ ')).read()) >= int(VERSION_NUMBER) + 4:
                 LOGGER.info(
                     "Nombre maximale de dossier sauvegardé atteint. Suppression de la plus vieille sauvegarde")
                 if VERSION_FORMAT == "date":
@@ -254,9 +264,9 @@ def version_handler(client):
                                 directory_removed)
                     os.system('rm -r ' + directory_removed)
                 elif VERSION_FORMAT == "number":
-                    directory_removed = get_last_number_local()
+                    directory_removed = get_first_number_local()
                     LOGGER.info("Suppression du dossier %s", directory_removed)
-                    os.system('rm -r ' + directory_removed)
+                    os.system('rm -r ' + (BACKUP_DIRECTORY + '/' + str(directory_removed)).replace(' ','\ '))
         LOGGER.info("Création du dossier de sauvegarde : %s", name_directory)
         os.system("mkdir " + BACKUP_DIRECTORY.replace(' ', '\ ') +
                   '/' + name_directory.replace(' ', '\ '))
@@ -267,6 +277,7 @@ def main():
         dans le fichier de configuration.
     '''
     global directory_removed
+    global size_save
     try:
         if WITH_FTPS:
             LOGGER.info("Utilisation du protocole FTPS")
@@ -307,6 +318,7 @@ def main():
         try:
             version_handler(client)
         except ValueError as error:
+            print(str(error))
             LOGGER.warning(
                 "La nomenclature des dossiers à changé, vous devez retourner à l'ancienne version ou supprimer les sauvegardes existantes.")
         else:
@@ -323,7 +335,6 @@ def main():
                             "Un dossier à enregistrer n'existe pas. Vérifiez le chemin fourni")
                     else:
                         client.cwd('..')
-                        global size_save
                         size_save += int(os.popen("du -sk " +
                                                   directory.replace(' ', '\ ') +
                                                   " | awk '{print $1}'").read())
@@ -347,11 +358,13 @@ def main():
                 for directory in DIRECTORY_LIST:
                     LOGGER.info("Copie du dossier : %s", directory)
                     name_directory_backup = directory.split('/')[-1]
-                    name_directory_backup = BACKUP_DIRECTORY + '/' + name_directory_backup
+                    name_directory_backup = BACKUP_DIRECTORY + '/' + name_directory + '/' + name_directory_backup
                     local_copy(directory, name_directory_backup)
+                    size_save += int(os.popen("du -sk " +
+                                              directory.replace(' ', '\ ') +
+                                              " | awk '{print $1}'").read())
             if not WITH_LOCAL_SAVE:
                 client.close()
-
 
 DIRECTORY_LIST = get_paths(DIRECTORIES_TO_SAVE)
 config_ok = verif_config.main() #Vérification du fichier de configuration.
