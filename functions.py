@@ -54,6 +54,8 @@ def get_paths(directories_path):
     return directories_path.split(",")
 
 # Fonctions qui effectuent les copies de dossiers:
+
+
 def local_copy(src, dest):
     '''Fonction qui effectue la copie du dossier spécifié en locale dans le chemin de destination'''
     shutil.copytree(src, dest)
@@ -97,7 +99,9 @@ def copy_sftp(sftp, path):
             copy_sftp(sftp, localpath)
             sftp.chdir('..')
 
-#Fonctions relatives à la suppression d'un dossier
+# Fonctions relatives à la suppression d'un dossier
+
+
 def remove_ftp_dir(ftp, path):
     ''' Fonction qui supprime un dossier du serveur en utilisant le protocole ftp'''
     for (name, properties) in ftp.mlsd(path=path):
@@ -131,7 +135,9 @@ def remove_directory_sftp(sftp, path):
             sftp.remove(filepath)
     sftp.rmdir(path)
 
-#Fonction relative au déplacement et à la création de dossier dans la destination
+# Fonction relative au déplacement et à la création de dossier dans la destination
+
+
 def go_to_directory_ftp(ftp, path):
     ''' Fonction qui permet de se déplacer dans le dossier voulu sur le serveur.
         Si le chemin n'existe pas, la fonction créé les répertoires manquants.
@@ -165,6 +171,7 @@ def go_to_directory_sftp(sftp, path):
             sftp.mkdir(directory)
         sftp.chdir(directory)
 
+
 def go_to_directory_local(path):
     ''' Fonction qui permet de se déplacer dans le dossier voulu sur le serveur.
         Si le chemin n'existe pas, la fonction créé les répertoires manquants.
@@ -181,7 +188,9 @@ def go_to_directory_local(path):
             os.mkdir(directory)
         os.chdir(directory)
 
-#Fonctions relative à la récupération du dernier numéro de dossier utilisé
+# Fonctions relative à la récupération du dernier numéro de dossier utilisé
+
+
 def get_last_number_sftp(client):
     ''' Fonction qui récupère le dernier nombre utilisé pour faire une sauvegarde avec sftp'''
     if len(client.listdir()) != 0:
@@ -197,6 +206,7 @@ def get_last_number_ftp(client):
     else:
         return 0
 
+
 def get_last_number_local():
     ''' Fonction qui récupère le dernier nombre utilisé pour faire une sauvegarde en locale'''
     if len(os.listdir()) != 0:
@@ -204,15 +214,19 @@ def get_last_number_local():
     else:
         return 0
 
+
 def get_first_number_local():
     ''' Fonction qui récupère le plus petit nombre utilisé pour faire une sauvegarde en locale'''
     list = os.popen('ls ' + BACKUP_DIRECTORY.replace(' ', '\ ')
                     ).read().split('\n')
     list.remove('')
-    if len(list)>0:
+    if len(list) > 0:
         return min([int(i) for i in list])
+    return 0
 
-#Fonction qui gère la nomenclature des dossiers en fonctions des options précisé par l'utilisateur.
+# Fonction qui gère la nomenclature des dossiers en fonctions des options précisé par l'utilisateur.
+
+
 def version_handler(client):
     ''' Fonction qui vérifie s'il faut gérer le nombre de sauvegarde à garder
         sur le serveur et qui supprime des sauvegardes existantes si besoin
@@ -272,11 +286,12 @@ def version_handler(client):
                     directory_removed = os.listdir()[0]
                     LOGGER.info("Suppression du dossier %s",
                                 directory_removed)
-                    os.system('rm -r ' + directory_removed.replace(' ','\ '))
+                    os.system('rm -r ' + directory_removed.replace(' ', '\ '))
                 elif VERSION_FORMAT == "number":
                     directory_removed = min([int(i) for i in os.listdir()])
                     LOGGER.info("Suppression du dossier %s", directory_removed)
-                    os.system('rm -r ' + (BACKUP_DIRECTORY + '/' + str(directory_removed)).replace(' ','\ '))
+                    os.system('rm -r ' + (BACKUP_DIRECTORY + '/' +
+                                          str(directory_removed)).replace(' ', '\ '))
         LOGGER.info("Création du dossier de sauvegarde : %s", name_directory)
         os.system("mkdir " + BACKUP_DIRECTORY.replace(' ', '\ ') +
                   '/' + name_directory.replace(' ', '\ '))
@@ -308,6 +323,9 @@ def main():
         elif WITH_LOCAL_SAVE:
             go_to_directory_local(BACKUP_DIRECTORY)
             client = None
+    except OSError as error:
+        LOGGER.warning(
+            "Impossible d'accéder au dossier où stocker les sauvegardes. Le chemin existe-t-il ou avez vous les droits pour créer des répertoires ?")
     except PermissionError as error:
         LOGGER.warning(
             "Impossible d'écrire dans le seveur. Vérifiez le chemin spécifié pour la sauvegarde et les droits de l'utilisateur renseigné.")
@@ -369,7 +387,8 @@ def main():
                 for directory in DIRECTORY_LIST:
                     LOGGER.info("Copie du dossier : %s", directory)
                     name_directory_backup = directory.split('/')[-1]
-                    name_directory_backup = BACKUP_DIRECTORY + '/' + name_directory + '/' + name_directory_backup
+                    name_directory_backup = BACKUP_DIRECTORY + '/' + \
+                        name_directory + '/' + name_directory_backup
                     local_copy(directory, name_directory_backup)
                     size_save += int(os.popen("du -sk " +
                                               directory.replace(' ', '\ ') +
@@ -377,8 +396,9 @@ def main():
             if not WITH_LOCAL_SAVE:
                 client.close()
 
+
 DIRECTORY_LIST = get_paths(DIRECTORIES_TO_SAVE)
-config_ok = verif_config.main() #Vérification du fichier de configuration.
+config_ok = verif_config.main()  # Vérification du fichier de configuration.
 if config_ok == "ok":
     main()
     with open(CURRENT_PATH + "/dir-saver.log", "r") as log:
@@ -399,7 +419,7 @@ if config_ok == "ok":
         LOGGER.info("Nom du dossier de sauvegarde : %s", name_directory)
         if MAIL_ON:
             try:
-                mail.success()
+                mail.success(CURRENT_PATH)
             except socket.gaierror as error:
                 LOGGER.warning("Impossible de se connecter au serveur SMTP")
             except TimeoutError as error:
@@ -411,7 +431,7 @@ if config_ok == "ok":
     else:
         if MAIL_ON:
             try:
-                mail.failure()
+                mail.failure(CURRENT_PATH)
             except socket.gaierror as error:
                 LOGGER.warning("Impossible de se connecter au serveur SMTP")
             except TimeoutError as error:

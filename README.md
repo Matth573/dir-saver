@@ -32,7 +32,7 @@ with_ftp, with_ftps, with_sftp, with_local_save : un seul de ces quatre champs d
 
 directories_to_save : La liste des chemins absolus, séparés par une virgule, des dossiers à sauvegarder.
 
-backup_directory : Le chemin absolu dans la destination où les sauvegarde seront enregistrés. ATTENTION : pour les sauvegardes en locales, le dossier doit déjà exister. Pour se qui est d'un serveur, l'application tentera de créer les dossier manquant pour effectuer la sauvegarde.
+backup_directory : Le chemin absolu dans la destination où les sauvegarde seront enregistrés. ATTENTION : Si le dossier n'existe pas, l'application tentera de créer les dossier manquant pour effectuer la sauvegarde. Vous devez donc avoir les droits pour créer des répertoires dans la destination si le chemin n'existe pas déjà.
 
 version_control : Mettez le sur "on" si vous voulez limiter le nombre de sauvegarde à enregistrer dans la destination. Sur "off" sinon.
 
@@ -53,3 +53,17 @@ smtp_host_email_address : mail de l'expéditeur
 smtp_password : mot de passe pour se connecter au serveur smtp
 
 send_to : adresse du destinataire
+
+## Automatisation de la sauvegarde
+
+Vous pouvez automatiser la sauvegarde en lançant automatiquement le script bash grâce à cron:
+
+Lancer la commande suivante pour modifier la crontab.
+
+```bash
+EDITOR=nano crontab -e
+```
+
+### Pour plus de renseignement:
+
+https://fr.wikipedia.org/wiki/Cron

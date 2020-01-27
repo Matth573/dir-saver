@@ -3,6 +3,7 @@
 import smtplib
 import ssl
 import configparser
+import os
 from email import encoders
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
@@ -56,15 +57,16 @@ def send_mail(subject, body):
         server.sendmail(from_address, to_address, text)
 
 
-def success():
+def success(path):
     ''' Fonction qui envoie un mail disant que la copie des dossiers s'est bien passé'''
+    os.chdir(path)
     config = config_init()
     log_on = config.getboolean('mail', 'log_attached')
     if log_on:
         text = "Les dossiers ont bien été enregistrés, vous trouverez les log en pièce jointe.\nDétails :\n"
     else:
         text = "Les dossiers ont bien été enregistrés.\nDétails :\n"
-    with open("dir-saver.log", "r") as log:
+    with open(path + "/dir-saver.log", "r") as log:
         line = log.readline()
         while line.find("Copie réussie !") == -1:
             line = log.readline()
@@ -72,10 +74,11 @@ def success():
     send_mail("Copie réussie ! Directory_Saver", text)
 
 
-def failure():
+def failure(path):
     ''' Fonction qui envoie un mail disant qu'il y a eu un problème lors de la copie'''
+    os.chdir(path)
     text = "Erreur lors de la copie :\n"
-    with open("dir-saver.log", "r") as log:
+    with open(path + "/dir-saver.log", "r") as log:
         line = log.readline()
         while line.find("WARNING") != -1:
             line = log.readline()
