@@ -46,6 +46,7 @@ nb_file_save = 0
 size_save = 0
 name_directory = None
 directory_removed = None
+CURRENT_PATH = os.getcwd()
 
 
 def get_paths(directories_path):
@@ -55,7 +56,6 @@ def get_paths(directories_path):
 # Fonctions qui effectuent les copies de dossiers:
 def local_copy(src, dest):
     '''Fonction qui effectue la copie du dossier spécifié en locale dans le chemin de destination'''
-    LOGGER.info("Copie du dossier %s", src.split('/')[-1])
     shutil.copytree(src, dest)
 
 
@@ -165,6 +165,22 @@ def go_to_directory_sftp(sftp, path):
             sftp.mkdir(directory)
         sftp.chdir(directory)
 
+def go_to_directory_local(path):
+    ''' Fonction qui permet de se déplacer dans le dossier voulu sur le serveur.
+        Si le chemin n'existe pas, la fonction créé les répertoires manquants.
+    '''
+    LOGGER.info("Déplacement jusqu'au dossier : %s", path)
+    listdir = path.split('/')
+    os.chdir('/')
+    if listdir[0] == '':
+        listdir.remove('')
+    for directory in listdir:
+        if not directory in os.listdir():
+            LOGGER.info(
+                "Le dossier %s n'existe pas, création du dossier", directory)
+            os.mkdir(directory)
+        os.chdir(directory)
+
 #Fonctions relative à la récupération du dernier numéro de dossier utilisé
 def get_last_number_sftp(client):
     ''' Fonction qui récupère le dernier nombre utilisé pour faire une sauvegarde avec sftp'''
@@ -181,14 +197,10 @@ def get_last_number_ftp(client):
     else:
         return 0
 
-
 def get_last_number_local():
     ''' Fonction qui récupère le dernier nombre utilisé pour faire une sauvegarde en locale'''
-    list = os.popen('ls ' + BACKUP_DIRECTORY.replace(' ', '\ ')
-                    ).read().split('\n')
-    list.remove('')
-    if len(list)>0:
-        return max([int(i) for i in list])
+    if len(os.listdir()) != 0:
+        return max([int(i) for i in os.listdir()])
     else:
         return 0
 
@@ -253,18 +265,16 @@ def version_handler(client):
         client.chdir(name_directory)
     elif WITH_LOCAL_SAVE:
         if VERSION_CONTROL:
-            #import pdb; pdb.set_trace()
-            while len(os.popen('ls ' + BACKUP_DIRECTORY.replace(' ', '\ ')).read()) >= int(VERSION_NUMBER) + 4:
+            while len(os.listdir()) >= int(VERSION_NUMBER):
                 LOGGER.info(
                     "Nombre maximale de dossier sauvegardé atteint. Suppression de la plus vieille sauvegarde")
                 if VERSION_FORMAT == "date":
-                    directory_removed = os.popen(
-                        'ls ' + BACKUP_DIRECTORY.replace(' ', '\ ')).read().split('\n')[0]
+                    directory_removed = os.listdir()[0]
                     LOGGER.info("Suppression du dossier %s",
                                 directory_removed)
-                    os.system('rm -r ' + directory_removed)
+                    os.system('rm -r ' + directory_removed.replace(' ','\ '))
                 elif VERSION_FORMAT == "number":
-                    directory_removed = get_first_number_local()
+                    directory_removed = min([int(i) for i in os.listdir()])
                     LOGGER.info("Suppression du dossier %s", directory_removed)
                     os.system('rm -r ' + (BACKUP_DIRECTORY + '/' + str(directory_removed)).replace(' ','\ '))
         LOGGER.info("Création du dossier de sauvegarde : %s", name_directory)
@@ -296,6 +306,7 @@ def main():
             client.chdir("/sharedfolders/")
             go_to_directory_sftp(client, BACKUP_DIRECTORY)
         elif WITH_LOCAL_SAVE:
+            go_to_directory_local(BACKUP_DIRECTORY)
             client = None
     except PermissionError as error:
         LOGGER.warning(
@@ -370,7 +381,7 @@ DIRECTORY_LIST = get_paths(DIRECTORIES_TO_SAVE)
 config_ok = verif_config.main() #Vérification du fichier de configuration.
 if config_ok == "ok":
     main()
-    with open("dir-saver.log", "r") as log:
+    with open(CURRENT_PATH + "/dir-saver.log", "r") as log:
         text = "".join(log.readlines())
         if text.find("WARNING") != -1 or text.find("ERROR") != -1:
             error = True
@@ -378,7 +389,8 @@ if config_ok == "ok":
             error = False
     if not error:
         LOGGER.info("Copie réussie !")
-        LOGGER.info("Nombre de fichiers sauvegardés : %s", nb_file_save)
+        if not WITH_LOCAL_SAVE:
+            LOGGER.info("Nombre de fichiers sauvegardés : %s", nb_file_save)
         LOGGER.info("Volume sauvegardé : %s Ko", size_save)
         if directory_removed is not None:
             LOGGER.info(
