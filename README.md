@@ -15,6 +15,7 @@ Le logiciel nécessite les dépendances suivantes:
 - ftplib
 - smtplib
 - paramiko
+- nano
 
 
 
@@ -64,6 +65,22 @@ Lancer la commande suivante pour modifier la crontab.
 EDITOR=nano crontab -e
 ```
 
+Pour lancer la sauvegarde tous les jour, entrez la ligne suivantes : 
+
+```
+@daily ./direcotry_saver.sh >> /dev/null
+```
+
+Pour lancer la sauvegarde une fois par semaine, entrez la ligne suivante:
+
+```
+@weekly ./direcotry_saver.sh >> /dev/null
+```
+
+Pour quitter l'édition de la crontab, appuyez sur CTRL + x
+
 ### Pour plus de renseignement:
+
+La crontab permet également de spécifié à quelle heure ou quelle jour exactement vous souhaitez exécuter la sauvegarde. Pour de plus ample information vous pouvez suivre le lien suivant :
 
 https://fr.wikipedia.org/wiki/Cron
